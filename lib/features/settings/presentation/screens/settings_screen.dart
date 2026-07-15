@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:leroy_ai/core/constants/app_constants.dart';
 import 'package:leroy_ai/core/constants/app_routes.dart';
 import 'package:leroy_ai/core/theme/app_colors.dart';
+import 'package:leroy_ai/core/utils/snackbar_utils.dart';
+import 'package:leroy_ai/features/auth/presentation/providers/auth_provider.dart';
 import 'package:leroy_ai/shared/providers/app_config_provider.dart';
 import 'package:leroy_ai/shared/providers/theme_provider.dart';
 
@@ -21,12 +23,11 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          _SectionLabel(label: 'Appearance'),
+          const _SectionLabel(label: 'Appearance'),
           RadioListTile<ThemeMode>(
             title: const Text('System'),
             value: ThemeMode.system,
             groupValue: themeMode,
-            activeColor: AppColors.teal,
             onChanged: (v) {
               if (v != null) {
                 ref.read(themeModeProvider.notifier).setMode(v);
@@ -37,7 +38,6 @@ class SettingsScreen extends ConsumerWidget {
             title: const Text('Light'),
             value: ThemeMode.light,
             groupValue: themeMode,
-            activeColor: AppColors.teal,
             onChanged: (v) {
               if (v != null) {
                 ref.read(themeModeProvider.notifier).setMode(v);
@@ -48,24 +48,39 @@ class SettingsScreen extends ConsumerWidget {
             title: const Text('Dark'),
             value: ThemeMode.dark,
             groupValue: themeMode,
-            activeColor: AppColors.teal,
             onChanged: (v) {
               if (v != null) {
                 ref.read(themeModeProvider.notifier).setMode(v);
               }
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.brightness_6_outlined),
+            title: const Text('Toggle light / dark'),
+            trailing: Icon(
+              themeMode == ThemeMode.dark
+                  ? Icons.dark_mode_rounded
+                  : Icons.light_mode_rounded,
+              color: AppColors.teal,
+            ),
+            onTap: () =>
+                ref.read(themeModeProvider.notifier).toggleLightDark(),
+          ),
           const Divider(),
-          _SectionLabel(label: 'Data & backend'),
+          const _SectionLabel(label: 'Data & backend'),
           SwitchListTile(
             title: const Text('Demo mode'),
             subtitle: const Text(
-              'Use local mock services without Firebase credentials',
+              'Use local services without Firebase credentials',
             ),
             value: demoMode,
             activeColor: AppColors.teal,
             onChanged: (v) {
               ref.read(isDemoModeProvider.notifier).state = v;
+              AppSnackBar.success(
+                context,
+                v ? 'Demo mode enabled' : 'Demo mode disabled',
+              );
             },
           ),
           ListTile(
@@ -75,19 +90,24 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () async {
               await ref.read(onboardingCompleteProvider.notifier).reset();
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Onboarding reset')),
-                );
+                AppSnackBar.success(context, 'Onboarding reset');
+                context.go(AppRoutes.onboarding);
               }
             },
           ),
           const Divider(),
-          _SectionLabel(label: 'Account'),
+          const _SectionLabel(label: 'Account'),
           ListTile(
             leading: const Icon(Icons.person_outline_rounded),
             title: const Text('Profile'),
             trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => context.push(AppRoutes.profile),
+            onTap: () => context.go(AppRoutes.profile),
+          ),
+          ListTile(
+            leading: const Icon(Icons.edit_outlined),
+            title: const Text('Edit profile'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => context.push(AppRoutes.editProfile),
           ),
           ListTile(
             leading: const Icon(Icons.workspace_premium_outlined),
@@ -95,11 +115,25 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () => context.push(AppRoutes.subscription),
           ),
-          const Divider(),
-          _SectionLabel(label: 'About'),
           ListTile(
-            title: const Text('App'),
-            subtitle: Text('${AppConstants.appName} v${AppConstants.appVersion}'),
+            leading: const Icon(Icons.logout_rounded),
+            title: const Text('Sign out'),
+            onTap: () async {
+              await ref.read(authProvider.notifier).signOut();
+              if (context.mounted) context.go(AppRoutes.login);
+            },
+          ),
+          const Divider(),
+          const _SectionLabel(label: 'About'),
+          ListTile(
+            title: Text(AppConstants.appName),
+            subtitle: Text(
+              '${AppConstants.companyName}\nv${AppConstants.appVersion}',
+            ),
+          ),
+          ListTile(
+            title: const Text('Founder'),
+            subtitle: Text(AppConstants.founderName),
           ),
           ListTile(
             title: const Text('Architecture'),

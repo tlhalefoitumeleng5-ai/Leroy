@@ -95,7 +95,7 @@ class LeroyLogo extends StatelessWidget {
         if (showWordmark) ...[
           const SizedBox(height: 16),
           Text(
-            'Leroy AI',
+            'Leroy',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.5,

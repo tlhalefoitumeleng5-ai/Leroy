@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:leroy_ai/core/utils/snackbar_utils.dart';
 import 'package:leroy_ai/core/widgets/common_widgets.dart';
+import 'package:leroy_ai/features/auth/presentation/providers/auth_provider.dart';
 import 'package:leroy_ai/features/subscription/presentation/providers/subscription_provider.dart';
 import 'package:leroy_ai/shared/widgets/feature_widgets.dart';
 
@@ -52,19 +53,22 @@ class SubscriptionScreen extends ConsumerWidget {
                   onPressed: state.selectedPlanId == state.currentPlanId
                       ? null
                       : () async {
+                          final selected = state.selectedPlanId;
                           final ok = await ref
                               .read(subscriptionProvider.notifier)
                               .confirm();
                           if (!context.mounted) return;
                           if (ok) {
+                            ref.read(authProvider.notifier).setPlan(selected);
                             AppSnackBar.success(
                               context,
-                              'Plan updated to ${state.selectedPlanId}',
+                              'Plan updated to $selected',
                             );
                           } else {
                             AppSnackBar.show(
                               context,
-                              state.error ?? 'Unable to update plan',
+                              ref.read(subscriptionProvider).error ??
+                                  'Unable to update plan',
                               isError: true,
                             );
                           }

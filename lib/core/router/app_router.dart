@@ -11,14 +11,16 @@ import 'package:leroy_ai/features/chat/presentation/screens/chat_list_screen.dar
 import 'package:leroy_ai/features/home/presentation/screens/home_screen.dart';
 import 'package:leroy_ai/features/image_generator/presentation/screens/image_generator_screen.dart';
 import 'package:leroy_ai/features/onboarding/presentation/screens/onboarding_screen.dart';
+import 'package:leroy_ai/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:leroy_ai/features/profile/presentation/screens/profile_screen.dart';
 import 'package:leroy_ai/features/prompt_library/presentation/screens/prompt_library_screen.dart';
 import 'package:leroy_ai/features/settings/presentation/screens/settings_screen.dart';
 import 'package:leroy_ai/features/splash/presentation/screens/splash_screen.dart';
 import 'package:leroy_ai/features/subscription/presentation/screens/subscription_screen.dart';
 import 'package:leroy_ai/shared/providers/app_config_provider.dart';
+import 'package:leroy_ai/shared/widgets/main_shell.dart';
 
-final _rootNavigatorKey = GlobalKey<NavigatorState>();
+final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authProvider);
@@ -77,45 +79,82 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.forgotPassword,
         builder: (_, __) => const ForgotPasswordScreen(),
       ),
-      GoRoute(
-        path: AppRoutes.home,
-        builder: (_, __) => const HomeScreen(),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return MainShell(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.home,
+                builder: (_, __) => const HomeScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.chat,
+                builder: (_, __) => const ChatListScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':chatId',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    builder: (_, state) => ChatDetailScreen(
+                      chatId: state.pathParameters['chatId']!,
+                      initialPrompt: state.uri.queryParameters['prompt'],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.imageGenerator,
+                builder: (_, __) => const ImageGeneratorScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.promptLibrary,
+                builder: (_, __) => const PromptLibraryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.profile,
+                builder: (_, __) => const ProfileScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
-        path: AppRoutes.chat,
-        builder: (_, __) => const ChatListScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.chatDetail,
-        builder: (_, state) => ChatDetailScreen(
-          chatId: state.pathParameters['chatId']!,
-        ),
-      ),
-      GoRoute(
-        path: AppRoutes.imageGenerator,
-        builder: (_, __) => const ImageGeneratorScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.promptLibrary,
-        builder: (_, __) => const PromptLibraryScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.profile,
-        builder: (_, __) => const ProfileScreen(),
-      ),
-      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.subscription,
         builder: (_, __) => const SubscriptionScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.settings,
         builder: (_, __) => const SettingsScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.editProfile,
+        builder: (_, __) => const EditProfileScreen(),
       ),
     ],
   );
 });
 
-/// Bridges Riverpod auth changes into go_router refresh.
 class _AuthRefresh extends ChangeNotifier {
   _AuthRefresh(this._ref) {
     _ref.listen(authProvider, (_, __) => notifyListeners());

@@ -1,8 +1,11 @@
-/// Application-wide constants for Leroy AI.
+/// Application-wide constants for Leroy.
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'Leroy AI';
+  static const String appName = 'Leroy';
+  static const String appFullName = 'Leroy AI';
+  static const String companyName = 'Leroy AI Solutions';
+  static const String founderName = 'Tlhalefo Leroy John Itumeleng';
   static const String appTagline = 'Your intelligent creative companion';
   static const String appVersion = '1.0.0';
 
@@ -10,6 +13,7 @@ class AppConstants {
   static const String keyOnboardingComplete = 'onboarding_complete';
   static const String keyThemeMode = 'theme_mode';
   static const String keyDemoMode = 'demo_mode';
+  static const String keyPendingPrompt = 'pending_prompt';
 
   // Firestore collections
   static const String usersCollection = 'users';
