@@ -10,4 +10,6 @@ abstract class ImageRepository {
   });
 
   ResultFuture<List<GeneratedImageEntity>> getHistory(String userId);
+
+  ResultFuture<void> deleteImage(String userId, String imageId);
 }

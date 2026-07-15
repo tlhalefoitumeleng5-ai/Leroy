@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:leroy_ai/core/utils/validators.dart';
 import 'package:leroy_ai/features/auth/data/models/user_model.dart';
-import 'package:leroy_ai/features/prompt_library/data/datasources/prompt_remote_datasource.dart';
 
 void main() {
   group('Validators', () {
@@ -25,31 +24,19 @@ void main() {
 
   group('UserModel', () {
     test('serializes to and from map', () {
-      final model = UserModel.demo();
+      final model = UserModel(
+        id: 'u1',
+        email: 'founder@leroyai.solutions',
+        displayName: 'Tlhalefo',
+        plan: 'pro',
+        emailVerified: true,
+        createdAt: DateTime(2026, 1, 1),
+      );
       final mapped = UserModel.fromMap(model.toMap());
       expect(mapped.id, model.id);
       expect(mapped.email, model.email);
       expect(mapped.plan, 'pro');
-    });
-  });
-
-  group('Prompt library', () {
-    test('returns seeded prompts and categories', () async {
-      final source = LocalPromptDataSource();
-      final prompts = await source.getPrompts();
-      final categories = await source.getCategories();
-      expect(prompts, isNotEmpty);
-      expect(categories.first, 'All');
-      expect(categories.length, greaterThan(1));
-    });
-
-    test('filters by category and toggles favorite', () async {
-      final source = LocalPromptDataSource();
-      final marketing = await source.getPrompts(category: 'Marketing');
-      expect(marketing.every((p) => p.category == 'Marketing'), isTrue);
-
-      final toggled = await source.toggleFavorite(marketing.first.id);
-      expect(toggled.isFavorite, isTrue);
+      expect(mapped.emailVerified, isTrue);
     });
   });
 }

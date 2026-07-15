@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:leroy_ai/core/constants/app_constants.dart';
 import 'package:leroy_ai/core/errors/exceptions.dart';
 import 'package:leroy_ai/features/auth/data/models/user_model.dart';
+import 'dart:io';
 
 abstract class AuthRemoteDataSource {
   Stream<UserModel?> get authStateChanges;
@@ -20,6 +22,15 @@ abstract class AuthRemoteDataSource {
 
   Future<void> sendPasswordReset(String email);
 
+  Future<void> sendEmailVerification();
+
+  Future<void> reloadUser();
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  });
+
   Future<void> signOut();
 
   Future<UserModel?> getCurrentUser();
@@ -28,17 +39,22 @@ abstract class AuthRemoteDataSource {
     String? displayName,
     String? photoUrl,
   });
+
+  Future<String> uploadProfilePhoto(String filePath);
 }
 
 class FirebaseAuthDataSource implements AuthRemoteDataSource {
   FirebaseAuthDataSource({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
+    FirebaseStorage? storage,
   })  : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance;
+        _firestore = firestore ?? FirebaseFirestore.instance,
+        _storage = storage ?? FirebaseStorage.instance;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  final FirebaseStorage _storage;
 
   CollectionReference<Map<String, dynamic>> get _users =>
       _firestore.collection(AppConstants.usersCollection);
@@ -68,9 +84,6 @@ class FirebaseAuthDataSource implements AuthRemoteDataSource {
       return _mapUser(user);
     } on FirebaseAuthException catch (e) {
       throw AuthException(_mapAuthCode(e.code));
-    } catch (e) {
-      if (e is AuthException) rethrow;
-      throw AuthException(e.toString());
     }
   }
 
@@ -90,20 +103,19 @@ class FirebaseAuthDataSource implements AuthRemoteDataSource {
         throw AuthException('Registration failed. Please try again.');
       }
       await user.updateDisplayName(displayName.trim());
+      await user.sendEmailVerification();
       final model = UserModel(
         id: user.uid,
         email: user.email ?? email.trim(),
         displayName: displayName.trim(),
         plan: 'free',
+        emailVerified: user.emailVerified,
         createdAt: DateTime.now(),
       );
       await _users.doc(user.uid).set(model.toMap());
       return model;
     } on FirebaseAuthException catch (e) {
       throw AuthException(_mapAuthCode(e.code));
-    } catch (e) {
-      if (e is AuthException) rethrow;
-      throw AuthException(e.toString());
     }
   }
 
@@ -111,6 +123,45 @@ class FirebaseAuthDataSource implements AuthRemoteDataSource {
   Future<void> sendPasswordReset(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException catch (e) {
+      throw AuthException(_mapAuthCode(e.code));
+    }
+  }
+
+  @override
+  Future<void> sendEmailVerification() async {
+    final user = _auth.currentUser;
+    if (user == null) throw AuthException('No authenticated user.');
+    try {
+      await user.sendEmailVerification();
+    } on FirebaseAuthException catch (e) {
+      throw AuthException(_mapAuthCode(e.code));
+    }
+  }
+
+  @override
+  Future<void> reloadUser() async {
+    final user = _auth.currentUser;
+    if (user == null) throw AuthException('No authenticated user.');
+    await user.reload();
+  }
+
+  @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw AuthException('No authenticated user.');
+    }
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(newPassword);
     } on FirebaseAuthException catch (e) {
       throw AuthException(_mapAuthCode(e.code));
     }
@@ -125,7 +176,8 @@ class FirebaseAuthDataSource implements AuthRemoteDataSource {
   Future<UserModel?> getCurrentUser() async {
     final user = _auth.currentUser;
     if (user == null) return null;
-    return _mapUser(user);
+    await user.reload();
+    return _mapUser(_auth.currentUser!);
   }
 
   @override
@@ -134,22 +186,35 @@ class FirebaseAuthDataSource implements AuthRemoteDataSource {
     String? photoUrl,
   }) async {
     final user = _auth.currentUser;
-    if (user == null) {
-      throw AuthException('No authenticated user.');
-    }
-    if (displayName != null) {
-      await user.updateDisplayName(displayName);
-    }
-    if (photoUrl != null) {
-      await user.updatePhotoURL(photoUrl);
-    }
+    if (user == null) throw AuthException('No authenticated user.');
+    if (displayName != null) await user.updateDisplayName(displayName);
+    if (photoUrl != null) await user.updatePhotoURL(photoUrl);
     final updates = <String, dynamic>{};
     if (displayName != null) updates['displayName'] = displayName;
     if (photoUrl != null) updates['photoUrl'] = photoUrl;
     if (updates.isNotEmpty) {
       await _users.doc(user.uid).set(updates, SetOptions(merge: true));
     }
-    return _mapUser(user);
+    await user.reload();
+    return _mapUser(_auth.currentUser!);
+  }
+
+  @override
+  Future<String> uploadProfilePhoto(String filePath) async {
+    final user = _auth.currentUser;
+    if (user == null) throw AuthException('No authenticated user.');
+    try {
+      final ref = _storage.ref('users/${user.uid}/avatar.jpg');
+      await ref.putFile(
+        File(filePath),
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      final url = await ref.getDownloadURL();
+      await updateProfile(photoUrl: url);
+      return url;
+    } catch (e) {
+      throw ServerException('Failed to upload profile photo: $e');
+    }
   }
 
   Future<UserModel> _mapUser(User user) async {
@@ -165,6 +230,7 @@ class FirebaseAuthDataSource implements AuthRemoteDataSource {
       email: user.email ?? '',
       displayName: user.displayName,
       photoUrl: user.photoURL,
+      emailVerified: user.emailVerified,
       firestoreData: data,
     );
   }
@@ -187,84 +253,10 @@ class FirebaseAuthDataSource implements AuthRemoteDataSource {
         return 'Network error. Check your connection.';
       case 'invalid-credential':
         return 'Invalid email or password.';
+      case 'requires-recent-login':
+        return 'Please sign in again to continue.';
       default:
         return 'Authentication failed ($code).';
     }
-  }
-}
-
-/// Local demo auth for running without configured Firebase credentials.
-class DemoAuthDataSource implements AuthRemoteDataSource {
-  UserModel? _current;
-
-  @override
-  Stream<UserModel?> get authStateChanges async* {
-    yield _current;
-  }
-
-  @override
-  Future<UserModel> signIn({
-    required String email,
-    required String password,
-  }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    if (password.length < 6) {
-      throw AuthException('Incorrect password.');
-    }
-    _current = UserModel(
-      id: 'demo-${email.hashCode}',
-      email: email.trim(),
-      displayName: email.split('@').first,
-      plan: 'pro',
-      createdAt: DateTime.now(),
-    );
-    return _current!;
-  }
-
-  @override
-  Future<UserModel> signUp({
-    required String email,
-    required String password,
-    required String displayName,
-  }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    _current = UserModel(
-      id: 'demo-${email.hashCode}',
-      email: email.trim(),
-      displayName: displayName.trim(),
-      plan: 'free',
-      createdAt: DateTime.now(),
-    );
-    return _current!;
-  }
-
-  @override
-  Future<void> sendPasswordReset(String email) async {
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-  }
-
-  @override
-  Future<void> signOut() async {
-    _current = null;
-  }
-
-  @override
-  Future<UserModel?> getCurrentUser() async => _current;
-
-  @override
-  Future<UserModel> updateProfile({
-    String? displayName,
-    String? photoUrl,
-  }) async {
-    if (_current == null) throw AuthException('No authenticated user.');
-    _current = UserModel(
-      id: _current!.id,
-      email: _current!.email,
-      displayName: displayName ?? _current!.displayName,
-      photoUrl: photoUrl ?? _current!.photoUrl,
-      plan: _current!.plan,
-      createdAt: _current!.createdAt,
-    );
-    return _current!;
   }
 }

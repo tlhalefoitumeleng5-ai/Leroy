@@ -7,7 +7,6 @@ import 'package:leroy_ai/features/auth/domain/repositories/auth_repository.dart'
 
 class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl(this._remote);
-
   final AuthRemoteDataSource _remote;
 
   @override
@@ -19,8 +18,7 @@ class AuthRepositoryImpl implements AuthRepository {
     required String password,
   }) async {
     try {
-      final user = await _remote.signIn(email: email, password: password);
-      return Right(user);
+      return Right(await _remote.signIn(email: email, password: password));
     } catch (e) {
       return Left(mapExceptionToFailure(e));
     }
@@ -33,12 +31,11 @@ class AuthRepositoryImpl implements AuthRepository {
     required String displayName,
   }) async {
     try {
-      final user = await _remote.signUp(
+      return Right(await _remote.signUp(
         email: email,
         password: password,
         displayName: displayName,
-      );
-      return Right(user);
+      ));
     } catch (e) {
       return Left(mapExceptionToFailure(e));
     }
@@ -48,6 +45,42 @@ class AuthRepositoryImpl implements AuthRepository {
   ResultFuture<void> sendPasswordReset(String email) async {
     try {
       await _remote.sendPasswordReset(email);
+      return const Right(null);
+    } catch (e) {
+      return Left(mapExceptionToFailure(e));
+    }
+  }
+
+  @override
+  ResultFuture<void> sendEmailVerification() async {
+    try {
+      await _remote.sendEmailVerification();
+      return const Right(null);
+    } catch (e) {
+      return Left(mapExceptionToFailure(e));
+    }
+  }
+
+  @override
+  ResultFuture<void> reloadUser() async {
+    try {
+      await _remote.reloadUser();
+      return const Right(null);
+    } catch (e) {
+      return Left(mapExceptionToFailure(e));
+    }
+  }
+
+  @override
+  ResultFuture<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _remote.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
       return const Right(null);
     } catch (e) {
       return Left(mapExceptionToFailure(e));
@@ -67,8 +100,7 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   ResultFuture<UserEntity?> getCurrentUser() async {
     try {
-      final user = await _remote.getCurrentUser();
-      return Right(user);
+      return Right(await _remote.getCurrentUser());
     } catch (e) {
       return Left(mapExceptionToFailure(e));
     }
@@ -80,11 +112,19 @@ class AuthRepositoryImpl implements AuthRepository {
     String? photoUrl,
   }) async {
     try {
-      final user = await _remote.updateProfile(
+      return Right(await _remote.updateProfile(
         displayName: displayName,
         photoUrl: photoUrl,
-      );
-      return Right(user);
+      ));
+    } catch (e) {
+      return Left(mapExceptionToFailure(e));
+    }
+  }
+
+  @override
+  ResultFuture<String> uploadProfilePhoto(String filePath) async {
+    try {
+      return Right(await _remote.uploadProfilePhoto(filePath));
     } catch (e) {
       return Left(mapExceptionToFailure(e));
     }

@@ -7,6 +7,8 @@ import 'package:leroy_ai/core/utils/snackbar_utils.dart';
 import 'package:leroy_ai/core/utils/validators.dart';
 import 'package:leroy_ai/core/widgets/common_widgets.dart';
 import 'package:leroy_ai/features/image_generator/presentation/providers/image_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ImageGeneratorScreen extends ConsumerStatefulWidget {
   const ImageGeneratorScreen({super.key});
@@ -129,6 +131,31 @@ class _ImageGeneratorScreenState extends ConsumerState<ImageGeneratorScreen> {
               ).animate().fadeIn().scale(begin: const Offset(0.97, 0.97)),
               const SizedBox(height: 8),
               Text(state.latest!.prompt, style: theme.textTheme.bodySmall),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await launchUrl(
+                          Uri.parse(state.latest!.imageUrl),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      },
+                      icon: const Icon(Icons.download_outlined),
+                      label: const Text('Save / Open'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => Share.share(state.latest!.imageUrl),
+                      icon: const Icon(Icons.share_outlined),
+                      label: const Text('Share'),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 28),
             ],
             if (state.history.isNotEmpty) ...[

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:leroy_ai/core/constants/app_constants.dart';
 import 'package:leroy_ai/core/constants/app_routes.dart';
 import 'package:leroy_ai/core/theme/app_colors.dart';
 import 'package:leroy_ai/core/widgets/common_widgets.dart';
@@ -16,6 +17,7 @@ class HomeScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final theme = Theme.of(context);
     final name = user?.displayName.split(' ').first ?? 'Creator';
+    final plan = (user?.plan ?? 'free').toUpperCase();
 
     return Scaffold(
       body: SafeArea(
@@ -23,7 +25,7 @@ class HomeScreen extends ConsumerWidget {
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
                 child: Row(
                   children: [
                     Expanded(
@@ -31,44 +33,69 @@ class HomeScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Leroy AI',
+                            AppConstants.appName,
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: AppColors.teal,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            'Good to see you, $name',
-                            style: theme.textTheme.headlineSmall,
-                          ),
+                          Text('Welcome, $name',
+                              style: theme.textTheme.headlineSmall),
                         ],
                       ),
                     ),
                     IconButton(
-                      onPressed: () => context.push(AppRoutes.profile),
+                      tooltip: 'Settings',
+                      onPressed: () => context.push(AppRoutes.settings),
+                      icon: const Icon(Icons.settings_outlined),
+                    ),
+                    IconButton(
+                      tooltip: 'Profile',
+                      onPressed: () => context.go(AppRoutes.profile),
                       icon: CircleAvatar(
                         backgroundColor: AppColors.teal.withValues(alpha: 0.15),
-                        child: Text(
-                          (user?.displayName.isNotEmpty == true)
-                              ? user!.displayName[0].toUpperCase()
-                              : 'L',
-                          style: const TextStyle(
-                            color: AppColors.teal,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        backgroundImage: user?.photoUrl != null
+                            ? NetworkImage(user!.photoUrl!)
+                            : null,
+                        child: user?.photoUrl == null
+                            ? Text(
+                                (user?.displayName.isNotEmpty == true)
+                                    ? user!.displayName[0].toUpperCase()
+                                    : 'L',
+                                style: const TextStyle(
+                                  color: AppColors.teal,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              )
+                            : null,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+            if (user != null && !user.emailVerified)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Material(
+                    color: AppColors.amber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(16),
+                    child: ListTile(
+                      leading: const Icon(Icons.mark_email_unread_outlined,
+                          color: AppColors.amber),
+                      title: const Text('Verify your email'),
+                      subtitle: const Text('Tap to resend verification'),
+                      onTap: () => context.push(AppRoutes.verifyEmail),
+                    ),
+                  ),
+                ),
+              ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                 child: Container(
-                  width: double.infinity,
                   padding: const EdgeInsets.all(22),
                   decoration: BoxDecoration(
                     gradient: AppColors.brandGradient,
@@ -77,54 +104,52 @@ class HomeScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'What will you create today?',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Create with Leroy AI',
+                              style: theme.textTheme.headlineSmall
+                                  ?.copyWith(color: Colors.white),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              plan,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Start a conversation or generate a new image.',
+                        'Images, videos, chat, and assistants — powered by Firebase.',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white.withValues(alpha: 0.9),
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          FilledButton.tonal(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: AppColors.tealDark,
-                            ),
-                            onPressed: () => context.push(AppRoutes.chat),
-                            child: const Text('New chat'),
-                          ),
-                          OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              side: const BorderSide(color: Colors.white70),
-                            ),
-                            onPressed: () =>
-                                context.push(AppRoutes.imageGenerator),
-                            child: const Text('Generate image'),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
-                ).animate().fadeIn(duration: 450.ms).slideY(begin: 0.08, end: 0),
+                ).animate().fadeIn().slideY(begin: 0.08, end: 0),
               ),
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
                 child: SectionHeader(
-                  title: 'Workspace',
-                  subtitle: 'Your core creative tools',
+                  title: 'Studio',
+                  subtitle: 'Everything you need to create',
+                  actionLabel: 'Plans',
+                  onAction: () => context.push(AppRoutes.subscription),
                 ),
               ),
             ),
@@ -137,61 +162,65 @@ class HomeScreen extends ConsumerWidget {
                 childAspectRatio: 1.05,
                 children: [
                   FeatureTile(
-                    title: 'AI Chat',
-                    subtitle: 'Think and write with Leroy',
-                    icon: Icons.forum_outlined,
-                    onTap: () => context.push(AppRoutes.chat),
-                  ),
-                  FeatureTile(
-                    title: 'Image Studio',
-                    subtitle: 'Prompt-to-image creation',
+                    title: 'AI Image',
+                    subtitle: 'Generate & save visuals',
                     icon: Icons.palette_outlined,
                     accent: AppColors.coral,
-                    onTap: () => context.push(AppRoutes.imageGenerator),
+                    onTap: () => context.go(AppRoutes.imageGenerator),
                   ),
                   FeatureTile(
-                    title: 'Prompt Library',
-                    subtitle: 'Reusable creative briefs',
-                    icon: Icons.menu_book_outlined,
+                    title: 'AI Video',
+                    subtitle: 'Prompt to video',
+                    icon: Icons.videocam_outlined,
+                    accent: const Color(0xFF8B5CF6),
+                    onTap: () => context.push(AppRoutes.videoGenerator),
+                  ),
+                  FeatureTile(
+                    title: 'AI Chat',
+                    subtitle: 'Conversations with memory',
+                    icon: Icons.forum_outlined,
+                    onTap: () => context.go(AppRoutes.chat),
+                  ),
+                  FeatureTile(
+                    title: 'AI Assistant',
+                    subtitle: 'Focused productivity help',
+                    icon: Icons.smart_toy_outlined,
                     accent: AppColors.amber,
-                    onTap: () => context.push(AppRoutes.promptLibrary),
+                    onTap: () => context.push(AppRoutes.assistant),
                   ),
                   FeatureTile(
-                    title: 'Plans',
-                    subtitle: 'Unlock Pro & Studio',
+                    title: 'Templates',
+                    subtitle: 'Ready-to-use briefs',
+                    icon: Icons.dashboard_customize_outlined,
+                    onTap: () => context.push(AppRoutes.templates),
+                  ),
+                  FeatureTile(
+                    title: 'History',
+                    subtitle: 'Images, videos, chats',
+                    icon: Icons.history_rounded,
+                    accent: const Color(0xFF0EA5E9),
+                    onTap: () => context.go(AppRoutes.history),
+                  ),
+                  FeatureTile(
+                    title: 'Subscription',
+                    subtitle: 'Free to Business',
                     icon: Icons.workspace_premium_outlined,
                     accent: const Color(0xFF6366F1),
                     onTap: () => context.push(AppRoutes.subscription),
                   ),
+                  FeatureTile(
+                    title: 'Settings',
+                    subtitle: 'Theme, privacy, about',
+                    icon: Icons.settings_outlined,
+                    onTap: () => context.push(AppRoutes.settings),
+                  ),
                 ]
-                    .animate(interval: 80.ms)
-                    .fadeIn(duration: 350.ms)
-                    .slideY(begin: 0.1, end: 0),
+                    .animate(interval: 60.ms)
+                    .fadeIn(duration: 300.ms)
+                    .slideY(begin: 0.08, end: 0),
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
-                child: Column(
-                  children: [
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.settings_outlined),
-                      title: const Text('Settings'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => context.push(AppRoutes.settings),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.person_outline_rounded),
-                      title: const Text('Profile'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => context.push(AppRoutes.profile),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
         ),
       ),

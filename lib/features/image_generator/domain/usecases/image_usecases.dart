@@ -27,3 +27,10 @@ class GetImageHistoryUseCase {
   ResultFuture<List<GeneratedImageEntity>> call(String userId) =>
       _repo.getHistory(userId);
 }
+
+class DeleteImageUseCase {
+  DeleteImageUseCase(this._repo);
+  final ImageRepository _repo;
+  ResultFuture<void> call(String userId, String imageId) =>
+      _repo.deleteImage(userId, imageId);
+}
