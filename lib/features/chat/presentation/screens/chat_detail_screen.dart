@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:leroy_ai/core/theme/app_colors.dart';
+import 'package:leroy_ai/core/utils/snackbar_utils.dart';
 import 'package:leroy_ai/core/widgets/common_widgets.dart';
 import 'package:leroy_ai/features/chat/presentation/providers/chat_provider.dart';
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
-  const ChatDetailScreen({super.key, required this.chatId});
+  const ChatDetailScreen({
+    super.key,
+    required this.chatId,
+    this.initialPrompt,
+  });
 
   final String chatId;
+  final String? initialPrompt;
 
   @override
   ConsumerState<ChatDetailScreen> createState() => _ChatDetailScreenState();
@@ -16,6 +23,22 @@ class ChatDetailScreen extends ConsumerStatefulWidget {
 class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
+  var _didSendInitial = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final prompt = widget.initialPrompt?.trim();
+    if (prompt != null && prompt.isNotEmpty) {
+      _controller.text = prompt;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_didSendInitial && mounted) {
+          _didSendInitial = true;
+          _send();
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -32,7 +55,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     await Future<void>.delayed(const Duration(milliseconds: 80));
     if (_scroll.hasClients) {
       _scroll.animateTo(
-        _scroll.position.maxScrollExtent,
+        _scroll.position.maxScrollExtent + 120,
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
@@ -45,73 +68,118 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Conversation')),
+      appBar: AppBar(
+        title: const Text('Conversation'),
+        actions: [
+          IconButton(
+            tooltip: 'Copy last reply',
+            onPressed: () async {
+              final assistant = state.messages.reversed
+                  .where((m) => !m.isUser)
+                  .map((m) => m.content);
+              if (assistant.isEmpty) return;
+              await Clipboard.setData(ClipboardData(text: assistant.first));
+              if (context.mounted) {
+                AppSnackBar.success(context, 'Reply copied');
+              }
+            },
+            icon: const Icon(Icons.copy_all_outlined),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
             child: state.isLoading
                 ? const LoadingView()
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                    itemCount: state.messages.length + (state.isSending ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index >= state.messages.length) {
-                        return Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(18),
+                : state.messages.isEmpty && !state.isSending
+                    ? EmptyStateView(
+                        icon: Icons.auto_awesome,
+                        title: 'Ask Leroy anything',
+                        message:
+                            'Write a message below to start this conversation.',
+                      )
+                    : ListView.builder(
+                        controller: _scroll,
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                        itemCount:
+                            state.messages.length + (state.isSending ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index >= state.messages.length) {
+                            return Align(
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: theme
+                                      .colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.teal,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          final msg = state.messages[index];
+                          final isUser = msg.isUser;
+                          return Align(
+                            alignment: isUser
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: GestureDetector(
+                              onLongPress: () async {
+                                await Clipboard.setData(
+                                  ClipboardData(text: msg.content),
+                                );
+                                if (context.mounted) {
+                                  AppSnackBar.success(context, 'Copied');
+                                }
+                              },
+                              child: Container(
+                                constraints: BoxConstraints(
+                                  maxWidth:
+                                      MediaQuery.sizeOf(context).width * 0.82,
+                                ),
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient:
+                                      isUser ? AppColors.brandGradient : null,
+                                  color: isUser
+                                      ? null
+                                      : theme
+                                          .colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: const Radius.circular(18),
+                                    topRight: const Radius.circular(18),
+                                    bottomLeft:
+                                        Radius.circular(isUser ? 18 : 4),
+                                    bottomRight:
+                                        Radius.circular(isUser ? 4 : 18),
+                                  ),
+                                ),
+                                child: Text(
+                                  msg.content,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: isUser ? Colors.white : null,
+                                    height: 1.45,
+                                  ),
+                                ),
+                              ),
                             ),
-                            child: const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
-                        );
-                      }
-                      final msg = state.messages[index];
-                      final isUser = msg.isUser;
-                      return Align(
-                        alignment: isUser
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: Container(
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.sizeOf(context).width * 0.82,
-                          ),
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: isUser ? AppColors.brandGradient : null,
-                            color: isUser
-                                ? null
-                                : theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(18),
-                              topRight: const Radius.circular(18),
-                              bottomLeft: Radius.circular(isUser ? 18 : 4),
-                              bottomRight: Radius.circular(isUser ? 4 : 18),
-                            ),
-                          ),
-                          child: Text(
-                            msg.content,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: isUser ? Colors.white : null,
-                              height: 1.45,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                          );
+                        },
+                      ),
           ),
           SafeArea(
             top: false,
@@ -127,7 +195,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(),
                       decoration: const InputDecoration(
-                        hintText: 'Message Leroy AI…',
+                        hintText: 'Message Leroy…',
                       ),
                     ),
                   ),

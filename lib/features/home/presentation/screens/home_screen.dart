@@ -2,20 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:leroy_ai/core/constants/app_constants.dart';
 import 'package:leroy_ai/core/constants/app_routes.dart';
 import 'package:leroy_ai/core/theme/app_colors.dart';
 import 'package:leroy_ai/core/widgets/common_widgets.dart';
 import 'package:leroy_ai/features/auth/presentation/providers/auth_provider.dart';
+import 'package:leroy_ai/features/chat/presentation/providers/chat_provider.dart';
 import 'package:leroy_ai/shared/widgets/feature_widgets.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
+
+  Future<void> _startChat(BuildContext context, WidgetRef ref) async {
+    final session = await ref.read(chatListProvider.notifier).createSession();
+    if (session != null && context.mounted) {
+      context.push('/chat/${session.id}');
+    } else if (context.mounted) {
+      context.go(AppRoutes.chat);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     final theme = Theme.of(context);
     final name = user?.displayName.split(' ').first ?? 'Creator';
+    final plan = (user?.plan ?? 'free').toUpperCase();
 
     return Scaffold(
       body: SafeArea(
@@ -23,7 +35,7 @@ class HomeScreen extends ConsumerWidget {
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
                 child: Row(
                   children: [
                     Expanded(
@@ -31,7 +43,7 @@ class HomeScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Leroy AI',
+                            AppConstants.appName,
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: AppColors.teal,
                               fontWeight: FontWeight.w700,
@@ -46,7 +58,13 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     ),
                     IconButton(
-                      onPressed: () => context.push(AppRoutes.profile),
+                      tooltip: 'Settings',
+                      onPressed: () => context.push(AppRoutes.settings),
+                      icon: const Icon(Icons.settings_outlined),
+                    ),
+                    IconButton(
+                      tooltip: 'Profile',
+                      onPressed: () => context.go(AppRoutes.profile),
                       icon: CircleAvatar(
                         backgroundColor: AppColors.teal.withValues(alpha: 0.15),
                         child: Text(
@@ -66,7 +84,7 @@ class HomeScreen extends ConsumerWidget {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(22),
@@ -77,15 +95,38 @@ class HomeScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'What will you create today?',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'What will you create today?',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              plan,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Start a conversation or generate a new image.',
+                        'Chat, generate images, or reuse winning prompts.',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white.withValues(alpha: 0.9),
                         ),
@@ -100,7 +141,7 @@ class HomeScreen extends ConsumerWidget {
                               backgroundColor: Colors.white,
                               foregroundColor: AppColors.tealDark,
                             ),
-                            onPressed: () => context.push(AppRoutes.chat),
+                            onPressed: () => _startChat(context, ref),
                             child: const Text('New chat'),
                           ),
                           OutlinedButton(
@@ -109,7 +150,7 @@ class HomeScreen extends ConsumerWidget {
                               side: const BorderSide(color: Colors.white70),
                             ),
                             onPressed: () =>
-                                context.push(AppRoutes.imageGenerator),
+                                context.go(AppRoutes.imageGenerator),
                             child: const Text('Generate image'),
                           ),
                         ],
@@ -125,6 +166,8 @@ class HomeScreen extends ConsumerWidget {
                 child: SectionHeader(
                   title: 'Workspace',
                   subtitle: 'Your core creative tools',
+                  actionLabel: 'Plans',
+                  onAction: () => context.push(AppRoutes.subscription),
                 ),
               ),
             ),
@@ -140,24 +183,24 @@ class HomeScreen extends ConsumerWidget {
                     title: 'AI Chat',
                     subtitle: 'Think and write with Leroy',
                     icon: Icons.forum_outlined,
-                    onTap: () => context.push(AppRoutes.chat),
+                    onTap: () => context.go(AppRoutes.chat),
                   ),
                   FeatureTile(
                     title: 'Image Studio',
                     subtitle: 'Prompt-to-image creation',
                     icon: Icons.palette_outlined,
                     accent: AppColors.coral,
-                    onTap: () => context.push(AppRoutes.imageGenerator),
+                    onTap: () => context.go(AppRoutes.imageGenerator),
                   ),
                   FeatureTile(
                     title: 'Prompt Library',
                     subtitle: 'Reusable creative briefs',
                     icon: Icons.menu_book_outlined,
                     accent: AppColors.amber,
-                    onTap: () => context.push(AppRoutes.promptLibrary),
+                    onTap: () => context.go(AppRoutes.promptLibrary),
                   ),
                   FeatureTile(
-                    title: 'Plans',
+                    title: 'Upgrade',
                     subtitle: 'Unlock Pro & Studio',
                     icon: Icons.workspace_premium_outlined,
                     accent: const Color(0xFF6366F1),
@@ -174,19 +217,20 @@ class HomeScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
                 child: Column(
                   children: [
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.settings_outlined),
-                      title: const Text('Settings'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
+                    _QuickLink(
+                      icon: Icons.settings_outlined,
+                      title: 'Settings',
                       onTap: () => context.push(AppRoutes.settings),
                     ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.person_outline_rounded),
-                      title: const Text('Profile'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => context.push(AppRoutes.profile),
+                    _QuickLink(
+                      icon: Icons.person_outline_rounded,
+                      title: 'Profile',
+                      onTap: () => context.go(AppRoutes.profile),
+                    ),
+                    _QuickLink(
+                      icon: Icons.workspace_premium_outlined,
+                      title: 'Subscription',
+                      onTap: () => context.push(AppRoutes.subscription),
                     ),
                   ],
                 ),
@@ -195,6 +239,29 @@ class HomeScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _QuickLink extends StatelessWidget {
+  const _QuickLink({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon),
+      title: Text(title),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: onTap,
     );
   }
 }

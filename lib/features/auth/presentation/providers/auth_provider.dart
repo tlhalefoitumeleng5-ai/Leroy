@@ -141,6 +141,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
+  void setPlan(String planId) {
+    final user = state.user;
+    if (user == null) return;
+    state = state.copyWith(user: user.copyWith(plan: planId));
+  }
+
   void clearError() {
     state = state.copyWith(clearError: true);
   }
