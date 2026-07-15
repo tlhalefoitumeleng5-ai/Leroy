@@ -2,11 +2,43 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:leroy_ai/core/utils/snackbar_utils.dart';
 import 'package:leroy_ai/core/widgets/common_widgets.dart';
+import 'package:leroy_ai/features/auth/presentation/providers/auth_provider.dart';
 import 'package:leroy_ai/features/subscription/presentation/providers/subscription_provider.dart';
+import 'package:leroy_ai/shared/providers/dependency_providers.dart';
 import 'package:leroy_ai/shared/widgets/feature_widgets.dart';
 
 class SubscriptionScreen extends ConsumerWidget {
   const SubscriptionScreen({super.key});
+
+  Future<void> _checkout(
+    BuildContext context,
+    WidgetRef ref,
+    String provider,
+  ) async {
+    final userId = ref.read(currentUserProvider)?.id;
+    final planId = ref.read(subscriptionProvider).selectedPlanId;
+    if (userId == null) return;
+    if (planId == 'free') {
+      final ok =
+          await ref.read(subscriptionProvider.notifier).confirm();
+      if (!context.mounted) return;
+      if (ok) {
+        ref.read(authProvider.notifier).setPlan('free');
+        AppSnackBar.success(context, 'Switched to Free plan');
+      }
+      return;
+    }
+    final result = await ref.read(startCheckoutUseCaseProvider).call(
+          userId: userId,
+          planId: planId,
+          provider: provider,
+        );
+    if (!context.mounted) return;
+    result.fold(
+      (f) => AppSnackBar.show(context, f.message, isError: true),
+      (_) => AppSnackBar.success(context, 'Opening $provider checkout…'),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -21,7 +53,7 @@ class SubscriptionScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(20),
               children: [
                 Text(
-                  'Choose the plan that matches your creative pace.',
+                  'Choose Free, Starter, Pro, or Business. Paid plans checkout via Stripe or PayFast.',
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -43,33 +75,20 @@ class SubscriptionScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
                 LeroyButton(
-                  label: state.selectedPlanId == state.currentPlanId
-                      ? 'Current plan'
-                      : 'Continue with ${state.selectedPlanId}',
+                  label: state.selectedPlanId == 'free'
+                      ? 'Select Free plan'
+                      : 'Pay with Stripe',
                   isLoading: state.isSaving,
-                  onPressed: state.selectedPlanId == state.currentPlanId
-                      ? null
-                      : () async {
-                          final ok = await ref
-                              .read(subscriptionProvider.notifier)
-                              .confirm();
-                          if (!context.mounted) return;
-                          if (ok) {
-                            AppSnackBar.success(
-                              context,
-                              'Plan updated to ${state.selectedPlanId}',
-                            );
-                          } else {
-                            AppSnackBar.show(
-                              context,
-                              state.error ?? 'Unable to update plan',
-                              isError: true,
-                            );
-                          }
-                        },
+                  onPressed: () => _checkout(context, ref, 'stripe'),
                 ),
+                const SizedBox(height: 10),
+                if (state.selectedPlanId != 'free')
+                  LeroyButton(
+                    label: 'Pay with PayFast',
+                    isOutlined: true,
+                    onPressed: () => _checkout(context, ref, 'payfast'),
+                  ),
               ],
             ),
     );

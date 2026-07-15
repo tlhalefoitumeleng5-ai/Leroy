@@ -36,4 +36,21 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
       return Left(mapExceptionToFailure(e));
     }
   }
+
+  @override
+  ResultFuture<String> startCheckout({
+    required String userId,
+    required String planId,
+    required String provider,
+  }) async {
+    try {
+      return Right(await _remote.startCheckout(
+        userId: userId,
+        planId: planId,
+        provider: provider,
+      ));
+    } catch (e) {
+      return Left(mapExceptionToFailure(e));
+    }
+  }
 }

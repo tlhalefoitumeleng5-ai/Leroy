@@ -20,3 +20,19 @@ class SelectPlanUseCase {
   ResultFuture<void> call(String userId, String planId) =>
       _repo.selectPlan(userId, planId);
 }
+
+class StartCheckoutUseCase {
+  StartCheckoutUseCase(this._repo);
+  final SubscriptionRepository _repo;
+  ResultFuture<String> call({
+    required String userId,
+    required String planId,
+    required String provider,
+  }) {
+    return _repo.startCheckout(
+      userId: userId,
+      planId: planId,
+      provider: provider,
+    );
+  }
+}

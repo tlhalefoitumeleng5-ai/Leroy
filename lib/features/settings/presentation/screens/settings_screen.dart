@@ -4,108 +4,122 @@ import 'package:go_router/go_router.dart';
 import 'package:leroy_ai/core/constants/app_constants.dart';
 import 'package:leroy_ai/core/constants/app_routes.dart';
 import 'package:leroy_ai/core/theme/app_colors.dart';
+import 'package:leroy_ai/core/utils/snackbar_utils.dart';
+import 'package:leroy_ai/features/auth/presentation/providers/auth_provider.dart';
 import 'package:leroy_ai/shared/providers/app_config_provider.dart';
 import 'package:leroy_ai/shared/providers/theme_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
+  Future<void> _open(String url) async {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
-    final demoMode = ref.watch(isDemoModeProvider);
-    final theme = Theme.of(context);
+    final enabled = ref.watch(notificationsEnabledProvider);
+    final language = ref.watch(languageCodeProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          _SectionLabel(label: 'Appearance'),
+          const _Label('Appearance'),
           RadioListTile<ThemeMode>(
             title: const Text('System'),
             value: ThemeMode.system,
             groupValue: themeMode,
-            activeColor: AppColors.teal,
-            onChanged: (v) {
-              if (v != null) {
-                ref.read(themeModeProvider.notifier).setMode(v);
-              }
-            },
+            onChanged: (v) =>
+                ref.read(themeModeProvider.notifier).setMode(v!),
           ),
           RadioListTile<ThemeMode>(
             title: const Text('Light'),
             value: ThemeMode.light,
             groupValue: themeMode,
-            activeColor: AppColors.teal,
-            onChanged: (v) {
-              if (v != null) {
-                ref.read(themeModeProvider.notifier).setMode(v);
-              }
-            },
+            onChanged: (v) =>
+                ref.read(themeModeProvider.notifier).setMode(v!),
           ),
           RadioListTile<ThemeMode>(
             title: const Text('Dark'),
             value: ThemeMode.dark,
             groupValue: themeMode,
-            activeColor: AppColors.teal,
-            onChanged: (v) {
-              if (v != null) {
-                ref.read(themeModeProvider.notifier).setMode(v);
-              }
-            },
+            onChanged: (v) =>
+                ref.read(themeModeProvider.notifier).setMode(v!),
           ),
           const Divider(),
-          _SectionLabel(label: 'Data & backend'),
+          const _Label('Notifications'),
           SwitchListTile(
-            title: const Text('Demo mode'),
-            subtitle: const Text(
-              'Use local mock services without Firebase credentials',
-            ),
-            value: demoMode,
+            title: const Text('Push notifications'),
+            value: enabled,
             activeColor: AppColors.teal,
-            onChanged: (v) {
-              ref.read(isDemoModeProvider.notifier).state = v;
-            },
-          ),
-          ListTile(
-            title: const Text('Reset onboarding'),
-            subtitle: const Text('Show the intro flow again on next launch'),
-            trailing: const Icon(Icons.restart_alt_rounded),
-            onTap: () async {
-              await ref.read(onboardingCompleteProvider.notifier).reset();
+            onChanged: (v) async {
+              await ref
+                  .read(notificationsEnabledProvider.notifier)
+                  .setEnabled(v);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Onboarding reset')),
+                AppSnackBar.success(
+                  context,
+                  v ? 'Notifications enabled' : 'Notifications disabled',
                 );
               }
             },
           ),
           const Divider(),
-          _SectionLabel(label: 'Account'),
+          const _Label('Language'),
           ListTile(
-            leading: const Icon(Icons.person_outline_rounded),
-            title: const Text('Profile'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => context.push(AppRoutes.profile),
-          ),
-          ListTile(
-            leading: const Icon(Icons.workspace_premium_outlined),
-            title: const Text('Subscription'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => context.push(AppRoutes.subscription),
+            title: const Text('App language'),
+            subtitle: Text(language == 'en' ? 'English' : language),
+            trailing: DropdownButton<String>(
+              value: language,
+              items: const [
+                DropdownMenuItem(value: 'en', child: Text('English')),
+                DropdownMenuItem(value: 'fr', child: Text('Français')),
+                DropdownMenuItem(value: 'es', child: Text('Español')),
+              ],
+              onChanged: (v) {
+                if (v != null) {
+                  ref.read(languageCodeProvider.notifier).setLanguage(v);
+                }
+              },
+            ),
           ),
           const Divider(),
-          _SectionLabel(label: 'About'),
+          const _Label('Legal'),
           ListTile(
-            title: const Text('App'),
-            subtitle: Text('${AppConstants.appName} v${AppConstants.appVersion}'),
+            title: const Text('Privacy Policy'),
+            trailing: const Icon(Icons.open_in_new),
+            onTap: () => _open(AppConstants.privacyPolicyUrl),
           ),
           ListTile(
-            title: const Text('Architecture'),
+            title: const Text('Terms of Service'),
+            trailing: const Icon(Icons.open_in_new),
+            onTap: () => _open(AppConstants.termsOfServiceUrl),
+          ),
+          const Divider(),
+          const _Label('Account'),
+          ListTile(
+            title: const Text('Profile'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go(AppRoutes.profile),
+          ),
+          ListTile(
+            title: const Text('Sign out'),
+            onTap: () async {
+              await ref.read(authProvider.notifier).signOut();
+              if (context.mounted) context.go(AppRoutes.login);
+            },
+          ),
+          const Divider(),
+          const _Label('About'),
+          ListTile(
+            title: Text(AppConstants.appName),
             subtitle: Text(
-              'Clean Architecture · Riverpod · Firebase · Material 3',
-              style: theme.textTheme.bodySmall,
+              '${AppConstants.companyName}\n'
+              'Founder: ${AppConstants.founderName}\n'
+              'v${AppConstants.appVersion}',
             ),
           ),
         ],
@@ -114,20 +128,19 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label});
-  final String label;
+class _Label extends StatelessWidget {
+  const _Label(this.text);
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
       child: Text(
-        label.toUpperCase(),
+        text.toUpperCase(),
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
               color: AppColors.teal,
               fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
             ),
       ),
     );

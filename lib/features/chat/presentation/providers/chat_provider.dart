@@ -49,11 +49,12 @@ class ChatListNotifier extends StateNotifier<ChatListState> {
     );
   }
 
-  Future<ChatSession?> createSession() async {
+  Future<ChatSession?> createSession({String? title}) async {
     final userId = _userId;
     if (userId == null) return null;
-    final result =
-        await _ref.read(createChatSessionUseCaseProvider).call(userId);
+    final result = await _ref
+        .read(createChatSessionUseCaseProvider)
+        .call(userId, title: title);
     return result.fold((f) {
       state = state.copyWith(error: f.message);
       return null;
@@ -61,6 +62,20 @@ class ChatListNotifier extends StateNotifier<ChatListState> {
       state = state.copyWith(sessions: [session, ...state.sessions]);
       return session;
     });
+  }
+
+  Future<void> deleteSession(String chatId) async {
+    final userId = _userId;
+    if (userId == null) return;
+    final result = await _ref
+        .read(deleteChatSessionUseCaseProvider)
+        .call(userId, chatId);
+    result.fold(
+      (f) => state = state.copyWith(error: f.message),
+      (_) => state = state.copyWith(
+        sessions: state.sessions.where((s) => s.id != chatId).toList(),
+      ),
+    );
   }
 }
 

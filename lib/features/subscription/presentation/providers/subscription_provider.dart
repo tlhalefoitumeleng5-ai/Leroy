@@ -50,7 +50,11 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
   Future<void> load() async {
     state = state.copyWith(isLoading: true, clearError: true);
     final plansResult = await _ref.read(getPlansUseCaseProvider).call();
-    final userId = _ref.read(currentUserProvider)?.id ?? 'demo';
+    final userId = _ref.read(currentUserProvider)?.id;
+    if (userId == null) {
+      state = state.copyWith(isLoading: false, error: 'Not signed in');
+      return;
+    }
     final currentResult =
         await _ref.read(getCurrentPlanUseCaseProvider).call(userId);
 
@@ -73,7 +77,8 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
   }
 
   Future<bool> confirm() async {
-    final userId = _ref.read(currentUserProvider)?.id ?? 'demo';
+    final userId = _ref.read(currentUserProvider)?.id;
+    if (userId == null) return false;
     state = state.copyWith(isSaving: true, clearError: true);
     final result = await _ref
         .read(selectPlanUseCaseProvider)

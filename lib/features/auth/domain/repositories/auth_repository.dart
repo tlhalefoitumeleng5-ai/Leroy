@@ -17,6 +17,15 @@ abstract class AuthRepository {
 
   ResultFuture<void> sendPasswordReset(String email);
 
+  ResultFuture<void> sendEmailVerification();
+
+  ResultFuture<void> reloadUser();
+
+  ResultFuture<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  });
+
   ResultFuture<void> signOut();
 
   ResultFuture<UserEntity?> getCurrentUser();
@@ -25,4 +34,6 @@ abstract class AuthRepository {
     String? displayName,
     String? photoUrl,
   });
+
+  ResultFuture<String> uploadProfilePhoto(String filePath);
 }
