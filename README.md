@@ -18,7 +18,8 @@ Premium Flutter Android app for AI chat, image generation, and prompt management
 9. Prompt Library  
 10. User Profile  
 11. Subscription Plans  
-12. Settings (Light / Dark / System)
+12. Services (AI automation, We Build Apps, We Build Websites — ZAR pricing)  
+13. Settings (Light / Dark / System)
 
 ## Architecture
 
@@ -38,6 +39,7 @@ lib/
     ├── prompt_library/
     ├── profile/
     ├── subscription/
+    ├── services/
     └── settings/
 ```
 

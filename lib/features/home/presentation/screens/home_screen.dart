@@ -157,11 +157,11 @@ class HomeScreen extends ConsumerWidget {
                     onTap: () => context.push(AppRoutes.promptLibrary),
                   ),
                   FeatureTile(
-                    title: 'Plans',
-                    subtitle: 'Unlock Pro & Studio',
-                    icon: Icons.workspace_premium_outlined,
-                    accent: const Color(0xFF6366F1),
-                    onTap: () => context.push(AppRoutes.subscription),
+                    title: 'Services',
+                    subtitle: 'Apps, websites & AI in Rands',
+                    icon: Icons.handshake_outlined,
+                    accent: AppColors.coral,
+                    onTap: () => context.push(AppRoutes.services),
                   ),
                 ]
                     .animate(interval: 80.ms)
@@ -174,6 +174,13 @@ class HomeScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
                 child: Column(
                   children: [
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.workspace_premium_outlined),
+                      title: const Text('Subscription plans'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => context.push(AppRoutes.subscription),
+                    ),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.settings_outlined),

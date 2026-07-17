@@ -14,5 +14,6 @@ class AppRoutes {
   static const String promptLibrary = '/prompts';
   static const String profile = '/profile';
   static const String subscription = '/subscription';
+  static const String services = '/services';
   static const String settings = '/settings';
 }
