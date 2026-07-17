@@ -1,8 +1,8 @@
 {
   "project_info": {
     "project_number": "000000000000",
-    "project_id": "leroy-ai-demo",
-    "storage_bucket": "leroy-ai-demo.appspot.com"
+    "project_id": "leroy-ai",
+    "storage_bucket": "leroy-ai.appspot.com"
   },
   "client": [
     {

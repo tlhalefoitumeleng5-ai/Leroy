@@ -1,20 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:leroy_ai/features/auth/domain/entities/user_entity.dart';
+import 'package:leroy_ai/shared/providers/app_config_provider.dart';
 import 'package:leroy_ai/shared/providers/dependency_providers.dart';
 
-/// Auth UI state.
 class AuthState {
   const AuthState({
     this.user,
     this.isLoading = false,
     this.error,
     this.passwordResetSent = false,
+    this.verificationSent = false,
   });
 
   final UserEntity? user;
   final bool isLoading;
   final String? error;
   final bool passwordResetSent;
+  final bool verificationSent;
 
   bool get isAuthenticated => user != null;
 
@@ -23,6 +27,7 @@ class AuthState {
     bool? isLoading,
     String? error,
     bool? passwordResetSent,
+    bool? verificationSent,
     bool clearUser = false,
     bool clearError = false,
   }) {
@@ -31,31 +36,38 @@ class AuthState {
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       passwordResetSent: passwordResetSent ?? this.passwordResetSent,
+      verificationSent: verificationSent ?? this.verificationSent,
     );
   }
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._ref) : super(const AuthState()) {
-    _bootstrap();
+  AuthNotifier(this._ref) : super(const AuthState(isLoading: true)) {
+    _subscription = _ref
+        .read(authRepositoryProvider)
+        .authStateChanges
+        .listen(_onAuthChanged, onError: (Object e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    });
   }
 
   final Ref _ref;
+  StreamSubscription<UserEntity?>? _subscription;
 
-  Future<void> _bootstrap() async {
-    state = state.copyWith(isLoading: true, clearError: true);
-    final result = await _ref.read(getCurrentUserUseCaseProvider).call();
-    result.fold(
-      (failure) => state = state.copyWith(
-        isLoading: false,
-        error: failure.message,
-      ),
-      (user) => state = state.copyWith(
-        user: user,
-        isLoading: false,
-        clearUser: user == null,
-      ),
+  Future<void> _onAuthChanged(UserEntity? user) async {
+    state = state.copyWith(
+      user: user,
+      isLoading: false,
+      clearUser: user == null,
+      clearError: true,
     );
+    if (user != null) {
+      final notifications = _ref.read(notificationServiceProvider);
+      final token = await notifications.initialize();
+      if (token != null) {
+        await notifications.saveTokenForCurrentUser(token);
+      }
+    }
   }
 
   Future<bool> signIn(String email, String password) async {
@@ -93,7 +105,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return false;
       },
       (user) {
-        state = state.copyWith(user: user, isLoading: false);
+        state = state.copyWith(
+          user: user,
+          isLoading: false,
+          verificationSent: true,
+        );
         return true;
       },
     );
@@ -113,6 +129,52 @@ class AuthNotifier extends StateNotifier<AuthState> {
       },
       (_) {
         state = state.copyWith(isLoading: false, passwordResetSent: true);
+        return true;
+      },
+    );
+  }
+
+  Future<bool> sendEmailVerification() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    final result =
+        await _ref.read(sendEmailVerificationUseCaseProvider).call();
+    return result.fold(
+      (failure) {
+        state = state.copyWith(isLoading: false, error: failure.message);
+        return false;
+      },
+      (_) {
+        state = state.copyWith(isLoading: false, verificationSent: true);
+        return true;
+      },
+    );
+  }
+
+  Future<void> refreshUser() async {
+    await _ref.read(reloadUserUseCaseProvider).call();
+    final result = await _ref.read(getCurrentUserUseCaseProvider).call();
+    result.fold(
+      (f) => state = state.copyWith(error: f.message),
+      (user) => state = state.copyWith(user: user, clearUser: user == null),
+    );
+  }
+
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    final result = await _ref.read(changePasswordUseCaseProvider).call(
+          currentPassword: currentPassword,
+          newPassword: newPassword,
+        );
+    return result.fold(
+      (failure) {
+        state = state.copyWith(isLoading: false, error: failure.message);
+        return false;
+      },
+      (_) {
+        state = state.copyWith(isLoading: false);
         return true;
       },
     );
@@ -141,8 +203,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
-  void clearError() {
-    state = state.copyWith(clearError: true);
+  Future<bool> uploadPhoto(String path) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    final result =
+        await _ref.read(uploadProfilePhotoUseCaseProvider).call(path);
+    return result.fold(
+      (failure) {
+        state = state.copyWith(isLoading: false, error: failure.message);
+        return false;
+      },
+      (_) async {
+        await refreshUser();
+        state = state.copyWith(isLoading: false);
+        return true;
+      },
+    );
+  }
+
+  void setPlan(String planId) {
+    final user = state.user;
+    if (user == null) return;
+    state = state.copyWith(user: user.copyWith(plan: planId));
+  }
+
+  void clearError() => state = state.copyWith(clearError: true);
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 }
 

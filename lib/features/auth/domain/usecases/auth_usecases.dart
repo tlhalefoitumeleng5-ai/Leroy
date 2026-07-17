@@ -9,9 +9,8 @@ class SignInUseCase {
   ResultFuture<UserEntity> call({
     required String email,
     required String password,
-  }) {
-    return _repository.signIn(email: email, password: password);
-  }
+  }) =>
+      _repository.signIn(email: email, password: password);
 }
 
 class SignUpUseCase {
@@ -22,22 +21,20 @@ class SignUpUseCase {
     required String email,
     required String password,
     required String displayName,
-  }) {
-    return _repository.signUp(
-      email: email,
-      password: password,
-      displayName: displayName,
-    );
-  }
+  }) =>
+      _repository.signUp(
+        email: email,
+        password: password,
+        displayName: displayName,
+      );
 }
 
 class ForgotPasswordUseCase {
   ForgotPasswordUseCase(this._repository);
   final AuthRepository _repository;
 
-  ResultFuture<void> call(String email) {
-    return _repository.sendPasswordReset(email);
-  }
+  ResultFuture<void> call(String email) =>
+      _repository.sendPasswordReset(email);
 }
 
 class SignOutUseCase {
@@ -61,10 +58,45 @@ class UpdateProfileUseCase {
   ResultFuture<UserEntity> call({
     String? displayName,
     String? photoUrl,
-  }) {
-    return _repository.updateProfile(
-      displayName: displayName,
-      photoUrl: photoUrl,
-    );
-  }
+  }) =>
+      _repository.updateProfile(
+        displayName: displayName,
+        photoUrl: photoUrl,
+      );
+}
+
+class SendEmailVerificationUseCase {
+  SendEmailVerificationUseCase(this._repository);
+  final AuthRepository _repository;
+
+  ResultFuture<void> call() => _repository.sendEmailVerification();
+}
+
+class ReloadUserUseCase {
+  ReloadUserUseCase(this._repository);
+  final AuthRepository _repository;
+
+  ResultFuture<void> call() => _repository.reloadUser();
+}
+
+class ChangePasswordUseCase {
+  ChangePasswordUseCase(this._repository);
+  final AuthRepository _repository;
+
+  ResultFuture<void> call({
+    required String currentPassword,
+    required String newPassword,
+  }) =>
+      _repository.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+}
+
+class UploadProfilePhotoUseCase {
+  UploadProfilePhotoUseCase(this._repository);
+  final AuthRepository _repository;
+
+  ResultFuture<String> call(String filePath) =>
+      _repository.uploadProfilePhoto(filePath);
 }

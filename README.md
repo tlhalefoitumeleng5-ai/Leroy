@@ -1,112 +1,69 @@
-# Leroy AI
+# Leroy AI v1.1.0
 
-Premium Flutter Android app for AI chat, image generation, and prompt management.
+Production Android AI app by **Leroy AI Solutions**  
+Founder: **Tlhalefo Leroy John Itumeleng**
 
-**Version:** 1.0.0  
-**Stack:** Flutter · Clean Architecture · Riverpod · Firebase Auth · Cloud Firestore · Material 3
+## Stack
 
-## Features (v1.0)
+Flutter · Clean Architecture · Riverpod · Firebase Auth · Firestore · Storage · Cloud Functions · FCM · Stripe · PayFast · Material 3
 
-1. Splash Screen  
-2. Onboarding  
-3. Login  
-4. Registration  
-5. Forgot Password  
-6. Home Dashboard  
-7. AI Chat  
-8. AI Image Generator  
-9. Prompt Library  
-10. User Profile  
-11. Subscription Plans  
-12. Settings (Light / Dark / System)
+## Features
+
+- Firebase Authentication (sign up, sign in, forgot password, email verification, password change, logout)
+- Home dashboard (Image, Video, Chat, Assistant, Templates, Prompts, History, Settings)
+- AI Chat with voice input/output, copy, regenerate, swipe-to-delete
+- AI Image Generator with style/size, gallery save, share, history
+- AI Video Generator (fal.ai via Cloud Functions) with duration/quality/voice/music
+- Templates & Prompt Library from Firestore (per-user favorites)
+- History with search, download, delete
+- Subscriptions: Free / Starter / Pro / Business with Stripe + PayFast + webhooks
+- Push notifications with FCM token persistence
+- Dark / light / system theme, language, privacy, terms, about
+
+There is **no demo mode**. The app requires a configured Firebase project.
+
+## Configure Firebase
+
+1. Create a Firebase project (Auth Email/Password, Firestore, Storage, Functions, Messaging)
+2. Replace `android/app/google-services.json`
+3. Run `flutterfire configure` to refresh `lib/firebase_options.dart`
+4. Update `.firebaserc` with your project id
+5. Deploy:
+
+```bash
+cd functions && npm install
+firebase functions:secrets:set OPENAI_API_KEY
+firebase functions:secrets:set FAL_KEY
+firebase functions:secrets:set STRIPE_SECRET_KEY
+firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+firebase functions:secrets:set PAYFAST_MERCHANT_ID
+firebase functions:secrets:set PAYFAST_MERCHANT_KEY
+firebase functions:secrets:set PAYFAST_PASSPHRASE
+firebase deploy
+```
+
+6. From a signed-in client (or Firebase console), call `leroySeedCatalog` once to seed plans, prompts, and templates.
+
+7. Point Stripe webhook to `leroyStripeWebhook` and PayFast ITN to `leroyPayfastItn`.
+
+## Run & build
+
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --release
+```
 
 ## Architecture
 
 ```
 lib/
 ├── main.dart / app.dart
-├── firebase_options.dart
-├── core/                 # theme, router, errors, constants, shared widgets
-├── shared/providers/     # DI + theme + app config
-└── features/
-    ├── auth/
-    ├── splash/
-    ├── onboarding/
-    ├── home/
-    ├── chat/
-    ├── image_generator/
-    ├── prompt_library/
-    ├── profile/
-    ├── subscription/
-    └── settings/
-```
-
-Each feature follows Clean Architecture:
-
-- **domain** — entities, repository contracts, use cases  
-- **data** — models, datasources (Firebase + demo), repository implementations  
-- **presentation** — Riverpod providers, screens, widgets  
-
-## Getting started
-
-### Prerequisites
-
-- Flutter 3.32+ (Dart 3.8+)
-- Android Studio / SDK (minSdk 23)
-- Optional: Firebase project for production auth & Firestore
-
-### Install & run (demo mode)
-
-Demo mode is enabled automatically when Firebase API keys are placeholders.
-
-```bash
-flutter pub get
-flutter run
-```
-
-Demo credentials: any valid email + password (≥ 8 characters).
-
-### Connect Firebase (production)
-
-1. Create a Firebase project and enable **Email/Password** auth.  
-2. Create a Firestore database.  
-3. Add an Android app with package `com.leroyai.leroy_ai`.  
-4. Replace `android/app/google-services.json`.  
-5. Run:
-
-```bash
-dart pub global activate flutterfire_cli
-flutterfire configure
-```
-
-6. Toggle **Demo mode** off in Settings (or remove the `REPLACE_` API key).
-
-### Suggested Firestore rules (dev)
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}
-```
-
-## Design system
-
-- Material 3 with teal brand accent (`#0D9488`)
-- Typography: **Syne** (display) + **DM Sans** (body) via Google Fonts
-- Light & dark themes with atmospheric gradients
-- Motion via `flutter_animate` on splash, onboarding, and dashboard
-
-## Scripts
-
-```bash
-flutter analyze
-flutter test
-flutter build apk --release
+├── core/          # theme, router, services, utils
+├── shared/        # DI providers, shell
+└── features/      # auth, chat, image, video, history, …
+functions/         # AI + billing Cloud Functions
 ```
 
 ## License

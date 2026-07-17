@@ -36,4 +36,14 @@ class ImageRepositoryImpl implements ImageRepository {
       return Left(mapExceptionToFailure(e));
     }
   }
+
+  @override
+  ResultFuture<void> deleteImage(String userId, String imageId) async {
+    try {
+      await _remote.deleteImage(userId, imageId);
+      return const Right(null);
+    } catch (e) {
+      return Left(mapExceptionToFailure(e));
+    }
+  }
 }

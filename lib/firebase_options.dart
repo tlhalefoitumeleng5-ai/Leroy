@@ -35,25 +35,25 @@ class DefaultFirebaseOptions {
     apiKey: 'REPLACE_WITH_YOUR_FIREBASE_API_KEY',
     appId: '1:000000000000:web:0000000000000000000000',
     messagingSenderId: '000000000000',
-    projectId: 'leroy-ai-demo',
-    authDomain: 'leroy-ai-demo.firebaseapp.com',
-    storageBucket: 'leroy-ai-demo.appspot.com',
+    projectId: 'leroy-ai',
+    authDomain: 'leroy-ai.firebaseapp.com',
+    storageBucket: 'leroy-ai.appspot.com',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'REPLACE_WITH_YOUR_FIREBASE_API_KEY',
     appId: '1:000000000000:android:0000000000000000000000',
     messagingSenderId: '000000000000',
-    projectId: 'leroy-ai-demo',
-    storageBucket: 'leroy-ai-demo.appspot.com',
+    projectId: 'leroy-ai',
+    storageBucket: 'leroy-ai.appspot.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'REPLACE_WITH_YOUR_FIREBASE_API_KEY',
     appId: '1:000000000000:ios:0000000000000000000000',
     messagingSenderId: '000000000000',
-    projectId: 'leroy-ai-demo',
-    storageBucket: 'leroy-ai-demo.appspot.com',
+    projectId: 'leroy-ai',
+    storageBucket: 'leroy-ai.appspot.com',
     iosBundleId: 'com.leroyai.leroyAi',
   );
 
@@ -61,8 +61,8 @@ class DefaultFirebaseOptions {
     apiKey: 'REPLACE_WITH_YOUR_FIREBASE_API_KEY',
     appId: '1:000000000000:ios:0000000000000000000000',
     messagingSenderId: '000000000000',
-    projectId: 'leroy-ai-demo',
-    storageBucket: 'leroy-ai-demo.appspot.com',
+    projectId: 'leroy-ai',
+    storageBucket: 'leroy-ai.appspot.com',
     iosBundleId: 'com.leroyai.leroyAi',
   );
 
@@ -70,8 +70,8 @@ class DefaultFirebaseOptions {
     apiKey: 'REPLACE_WITH_YOUR_FIREBASE_API_KEY',
     appId: '1:000000000000:web:0000000000000000000000',
     messagingSenderId: '000000000000',
-    projectId: 'leroy-ai-demo',
-    authDomain: 'leroy-ai-demo.firebaseapp.com',
-    storageBucket: 'leroy-ai-demo.appspot.com',
+    projectId: 'leroy-ai',
+    authDomain: 'leroy-ai.firebaseapp.com',
+    storageBucket: 'leroy-ai.appspot.com',
   );
 }

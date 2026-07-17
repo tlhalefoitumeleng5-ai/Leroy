@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:leroy_ai/core/theme/app_colors.dart';
+import 'package:leroy_ai/core/utils/snackbar_utils.dart';
 import 'package:leroy_ai/core/widgets/common_widgets.dart';
 import 'package:leroy_ai/features/chat/presentation/providers/chat_provider.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
-  const ChatDetailScreen({super.key, required this.chatId});
+  const ChatDetailScreen({
+    super.key,
+    required this.chatId,
+    this.initialPrompt,
+  });
 
   final String chatId;
+  final String? initialPrompt;
 
   @override
   ConsumerState<ChatDetailScreen> createState() => _ChatDetailScreenState();
@@ -16,11 +25,31 @@ class ChatDetailScreen extends ConsumerStatefulWidget {
 class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
+  final _speech = stt.SpeechToText();
+  final _tts = FlutterTts();
+  var _listening = false;
+  var _didSendInitial = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final prompt = widget.initialPrompt?.trim();
+    if (prompt != null && prompt.isNotEmpty) {
+      _controller.text = prompt;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_didSendInitial && mounted) {
+          _didSendInitial = true;
+          _send();
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
     _controller.dispose();
     _scroll.dispose();
+    _tts.stop();
     super.dispose();
   }
 
@@ -32,10 +61,47 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     await Future<void>.delayed(const Duration(milliseconds: 80));
     if (_scroll.hasClients) {
       _scroll.animateTo(
-        _scroll.position.maxScrollExtent,
+        _scroll.position.maxScrollExtent + 120,
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
+    }
+  }
+
+  Future<void> _toggleVoiceInput() async {
+    if (_listening) {
+      await _speech.stop();
+      setState(() => _listening = false);
+      return;
+    }
+    final available = await _speech.initialize();
+    if (!available) {
+      if (mounted) {
+        AppSnackBar.show(context, 'Speech recognition unavailable',
+            isError: true);
+      }
+      return;
+    }
+    setState(() => _listening = true);
+    await _speech.listen(
+      onResult: (result) {
+        _controller.text = result.recognizedWords;
+        _controller.selection = TextSelection.fromPosition(
+          TextPosition(offset: _controller.text.length),
+        );
+      },
+    );
+  }
+
+  Future<void> _speak(String text) async {
+    await _tts.speak(text);
+  }
+
+  Future<void> _regenerate() async {
+    await ref.read(chatDetailProvider(widget.chatId).notifier).regenerate();
+    final error = ref.read(chatDetailProvider(widget.chatId)).error;
+    if (error != null && mounted) {
+      AppSnackBar.show(context, error, isError: true);
     }
   }
 
@@ -45,7 +111,29 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Conversation')),
+      appBar: AppBar(
+        title: const Text('Conversation'),
+        actions: [
+          IconButton(
+            tooltip: 'Regenerate last reply',
+            onPressed: state.isSending ? null : _regenerate,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          IconButton(
+            tooltip: 'Copy last reply',
+            onPressed: () async {
+              final assistant = state.messages.reversed.where((m) => !m.isUser);
+              if (assistant.isEmpty) return;
+              await Clipboard.setData(
+                  ClipboardData(text: assistant.first.content));
+              if (context.mounted) {
+                AppSnackBar.success(context, 'Reply copied');
+              }
+            },
+            icon: const Icon(Icons.copy_all_outlined),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -54,22 +142,16 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 : ListView.builder(
                     controller: _scroll,
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                    itemCount: state.messages.length + (state.isSending ? 1 : 0),
+                    itemCount:
+                        state.messages.length + (state.isSending ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index >= state.messages.length) {
-                        return Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                        return const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: CircularProgressIndicator(
+                              color: AppColors.teal,
                             ),
                           ),
                         );
@@ -80,32 +162,46 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                         alignment: isUser
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
-                        child: Container(
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.sizeOf(context).width * 0.82,
-                          ),
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: isUser ? AppColors.brandGradient : null,
-                            color: isUser
-                                ? null
-                                : theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(18),
-                              topRight: const Radius.circular(18),
-                              bottomLeft: Radius.circular(isUser ? 18 : 4),
-                              bottomRight: Radius.circular(isUser ? 4 : 18),
+                        child: GestureDetector(
+                          onLongPress: () async {
+                            await Clipboard.setData(
+                                ClipboardData(text: msg.content));
+                            if (context.mounted) {
+                              AppSnackBar.success(context, 'Copied');
+                            }
+                          },
+                          child: Container(
+                            constraints: BoxConstraints(
+                              maxWidth:
+                                  MediaQuery.sizeOf(context).width * 0.82,
                             ),
-                          ),
-                          child: Text(
-                            msg.content,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: isUser ? Colors.white : null,
-                              height: 1.45,
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              gradient:
+                                  isUser ? AppColors.brandGradient : null,
+                              color: isUser
+                                  ? null
+                                  : theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  msg.content,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: isUser ? Colors.white : null,
+                                  ),
+                                ),
+                                if (!isUser)
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () => _speak(msg.content),
+                                    icon: const Icon(Icons.volume_up_outlined,
+                                        size: 18),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
@@ -119,6 +215,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
               child: Row(
                 children: [
+                  IconButton(
+                    onPressed: _toggleVoiceInput,
+                    icon: Icon(
+                      _listening ? Icons.mic : Icons.mic_none,
+                      color: _listening ? AppColors.coral : AppColors.teal,
+                    ),
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _controller,

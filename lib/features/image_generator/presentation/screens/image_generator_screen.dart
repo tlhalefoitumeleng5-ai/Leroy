@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:leroy_ai/core/theme/app_colors.dart';
+import 'package:leroy_ai/core/utils/media_saver.dart';
 import 'package:leroy_ai/core/utils/snackbar_utils.dart';
 import 'package:leroy_ai/core/utils/validators.dart';
 import 'package:leroy_ai/core/widgets/common_widgets.dart';
 import 'package:leroy_ai/features/image_generator/presentation/providers/image_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ImageGeneratorScreen extends ConsumerStatefulWidget {
   const ImageGeneratorScreen({super.key});
@@ -129,6 +131,43 @@ class _ImageGeneratorScreenState extends ConsumerState<ImageGeneratorScreen> {
               ).animate().fadeIn().scale(begin: const Offset(0.97, 0.97)),
               const SizedBox(height: 8),
               Text(state.latest!.prompt, style: theme.textTheme.bodySmall),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        try {
+                          await MediaSaver.saveImageFromUrl(
+                            state.latest!.imageUrl,
+                          );
+                          if (context.mounted) {
+                            AppSnackBar.success(context, 'Saved to gallery');
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            AppSnackBar.show(
+                              context,
+                              e.toString(),
+                              isError: true,
+                            );
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.download_outlined),
+                      label: const Text('Save'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => Share.share(state.latest!.imageUrl),
+                      icon: const Icon(Icons.share_outlined),
+                      label: const Text('Share'),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 28),
             ],
             if (state.history.isNotEmpty) ...[

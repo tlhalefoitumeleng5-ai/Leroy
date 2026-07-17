@@ -49,11 +49,12 @@ class ChatListNotifier extends StateNotifier<ChatListState> {
     );
   }
 
-  Future<ChatSession?> createSession() async {
+  Future<ChatSession?> createSession({String? title}) async {
     final userId = _userId;
     if (userId == null) return null;
-    final result =
-        await _ref.read(createChatSessionUseCaseProvider).call(userId);
+    final result = await _ref
+        .read(createChatSessionUseCaseProvider)
+        .call(userId, title: title);
     return result.fold((f) {
       state = state.copyWith(error: f.message);
       return null;
@@ -61,6 +62,20 @@ class ChatListNotifier extends StateNotifier<ChatListState> {
       state = state.copyWith(sessions: [session, ...state.sessions]);
       return session;
     });
+  }
+
+  Future<void> deleteSession(String chatId) async {
+    final userId = _userId;
+    if (userId == null) return;
+    final result = await _ref
+        .read(deleteChatSessionUseCaseProvider)
+        .call(userId, chatId);
+    result.fold(
+      (f) => state = state.copyWith(error: f.message),
+      (_) => state = state.copyWith(
+        sessions: state.sessions.where((s) => s.id != chatId).toList(),
+      ),
+    );
   }
 }
 
@@ -141,13 +156,49 @@ class ChatDetailNotifier extends StateNotifier<ChatDetailState> {
           content: content.trim(),
         );
     result.fold(
-      (f) => state = state.copyWith(isSending: false, error: f.message),
-      (reply) => state = state.copyWith(
-        messages: [...state.messages, reply],
-        isSending: false,
-      ),
+      (f) {
+        state = state.copyWith(
+          isSending: false,
+          error: f.message,
+          messages: state.messages.where((m) => m.id != optimistic.id).toList(),
+        );
+      },
+      (reply) {
+        final withoutOptimistic =
+            state.messages.where((m) => m.id != optimistic.id).toList();
+        state = state.copyWith(
+          messages: [
+            ...withoutOptimistic,
+            ChatMessage(
+              id: 'user-${DateTime.now().millisecondsSinceEpoch}',
+              role: MessageRole.user,
+              content: content.trim(),
+              createdAt: optimistic.createdAt,
+            ),
+            reply,
+          ],
+          isSending: false,
+        );
+      },
     );
     await _ref.read(chatListProvider.notifier).load();
+  }
+
+  Future<void> regenerate() async {
+    final userId = _userId;
+    if (userId == null) return;
+    state = state.copyWith(isSending: true, clearError: true);
+    final result = await _ref.read(regenerateChatReplyUseCaseProvider).call(
+          userId: userId,
+          chatId: chatId,
+        );
+    result.fold(
+      (f) => state = state.copyWith(isSending: false, error: f.message),
+      (_) async {
+        await load();
+        state = state.copyWith(isSending: false);
+      },
+    );
   }
 }
 

@@ -39,6 +39,17 @@ class SendChatMessageUseCase {
   }
 }
 
+class RegenerateChatReplyUseCase {
+  RegenerateChatReplyUseCase(this._repo);
+  final ChatRepository _repo;
+  ResultFuture<ChatMessage> call({
+    required String userId,
+    required String chatId,
+  }) {
+    return _repo.regenerateLastReply(userId: userId, chatId: chatId);
+  }
+}
+
 class DeleteChatSessionUseCase {
   DeleteChatSessionUseCase(this._repo);
   final ChatRepository _repo;
