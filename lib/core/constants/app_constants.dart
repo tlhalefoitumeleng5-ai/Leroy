@@ -22,6 +22,9 @@ class AppConstants {
   static const String promptsCollection = 'prompts';
   static const String historyCollection = 'history';
   static const String subscriptionsCollection = 'subscriptions';
+  static const String plansCollection = 'plans';
+
+  static const String fnSeedCatalog = 'leroySeedCatalog';
 
   static const String privacyPolicyUrl =
       'https://leroyai.solutions/privacy';

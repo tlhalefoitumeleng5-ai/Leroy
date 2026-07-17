@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:leroy_ai/core/theme/app_colors.dart';
+import 'package:leroy_ai/core/utils/media_saver.dart';
+import 'package:leroy_ai/core/utils/snackbar_utils.dart';
 import 'package:leroy_ai/core/widgets/common_widgets.dart';
 import 'package:leroy_ai/features/history/presentation/providers/history_provider.dart';
 
@@ -19,6 +20,23 @@ class HistoryScreen extends ConsumerWidget {
         return Icons.forum_outlined;
       default:
         return Icons.history;
+    }
+  }
+
+  Future<void> _download(BuildContext context, String type, String url) async {
+    try {
+      if (type == 'video') {
+        await MediaSaver.saveVideoFromUrl(url);
+      } else {
+        await MediaSaver.saveImageFromUrl(url);
+      }
+      if (context.mounted) {
+        AppSnackBar.success(context, 'Saved to gallery');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppSnackBar.show(context, e.toString(), isError: true);
+      }
     }
   }
 
@@ -91,14 +109,20 @@ class HistoryScreen extends ConsumerWidget {
                                     overflow: TextOverflow.ellipsis),
                                 subtitle: Text(item.type.toUpperCase()),
                                 trailing: item.url == null
-                                    ? null
+                                    ? IconButton(
+                                        tooltip: 'Delete',
+                                        onPressed: () => ref
+                                            .read(historyProvider.notifier)
+                                            .delete(item.id),
+                                        icon: const Icon(Icons.delete_outline),
+                                      )
                                     : PopupMenuButton<String>(
                                         onSelected: (value) async {
-                                          if (value == 'open') {
-                                            await launchUrl(
-                                              Uri.parse(item.url!),
-                                              mode: LaunchMode
-                                                  .externalApplication,
+                                          if (value == 'download') {
+                                            await _download(
+                                              context,
+                                              item.type,
+                                              item.url!,
                                             );
                                           } else if (value == 'share') {
                                             await Share.share(item.url!);
@@ -110,8 +134,8 @@ class HistoryScreen extends ConsumerWidget {
                                         },
                                         itemBuilder: (_) => const [
                                           PopupMenuItem(
-                                              value: 'open',
-                                              child: Text('Download / Open')),
+                                              value: 'download',
+                                              child: Text('Download')),
                                           PopupMenuItem(
                                               value: 'share',
                                               child: Text('Share')),

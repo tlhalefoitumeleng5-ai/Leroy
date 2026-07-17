@@ -14,8 +14,8 @@ class AiCloudService {
     required String chatId,
     List<Map<String, String>>? history,
   }) async {
+    // History already includes the latest user message.
     return _call(AppConstants.fnChat, {
-      'message': message,
       'chatId': chatId,
       if (history != null) 'history': history,
     });

@@ -78,6 +78,9 @@ final getChatMessagesUseCaseProvider = Provider(
 final sendChatMessageUseCaseProvider = Provider(
   (ref) => SendChatMessageUseCase(ref.watch(chatRepositoryProvider)),
 );
+final regenerateChatReplyUseCaseProvider = Provider(
+  (ref) => RegenerateChatReplyUseCase(ref.watch(chatRepositoryProvider)),
+);
 final deleteChatSessionUseCaseProvider = Provider(
   (ref) => DeleteChatSessionUseCase(ref.watch(chatRepositoryProvider)),
 );

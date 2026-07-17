@@ -98,12 +98,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   }
 
   Future<void> _regenerate() async {
-    final state = ref.read(chatDetailProvider(widget.chatId));
-    final lastUser = state.messages.reversed.where((m) => m.isUser);
-    if (lastUser.isEmpty) return;
-    await ref
-        .read(chatDetailProvider(widget.chatId).notifier)
-        .send(lastUser.first.content);
+    await ref.read(chatDetailProvider(widget.chatId).notifier).regenerate();
+    final error = ref.read(chatDetailProvider(widget.chatId)).error;
+    if (error != null && mounted) {
+      AppSnackBar.show(context, error, isError: true);
+    }
   }
 
   @override

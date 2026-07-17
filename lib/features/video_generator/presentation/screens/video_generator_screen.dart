@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:leroy_ai/core/utils/media_saver.dart';
 import 'package:leroy_ai/core/utils/snackbar_utils.dart';
 import 'package:leroy_ai/core/utils/validators.dart';
 import 'package:leroy_ai/core/widgets/common_widgets.dart';
@@ -112,11 +112,25 @@ class _VideoGeneratorScreenState extends ConsumerState<VideoGeneratorScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () async {
-                        final uri = Uri.parse(state.latest!.videoUrl);
-                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        try {
+                          await MediaSaver.saveVideoFromUrl(
+                            state.latest!.videoUrl,
+                          );
+                          if (context.mounted) {
+                            AppSnackBar.success(context, 'Saved to gallery');
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            AppSnackBar.show(
+                              context,
+                              e.toString(),
+                              isError: true,
+                            );
+                          }
+                        }
                       },
                       icon: const Icon(Icons.download_outlined),
-                      label: const Text('Open / Download'),
+                      label: const Text('Download'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -137,14 +151,27 @@ class _VideoGeneratorScreenState extends ConsumerState<VideoGeneratorScreen> {
                     (v) => ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.movie_outlined),
-                      title: Text(v.prompt, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      title: Text(v.prompt,
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
                       subtitle: Text('${v.durationSeconds}s · ${v.quality}'),
                       trailing: IconButton(
-                        icon: const Icon(Icons.open_in_new),
-                        onPressed: () => launchUrl(
-                          Uri.parse(v.videoUrl),
-                          mode: LaunchMode.externalApplication,
-                        ),
+                        icon: const Icon(Icons.download_outlined),
+                        onPressed: () async {
+                          try {
+                            await MediaSaver.saveVideoFromUrl(v.videoUrl);
+                            if (context.mounted) {
+                              AppSnackBar.success(context, 'Saved to gallery');
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              AppSnackBar.show(
+                                context,
+                                e.toString(),
+                                isError: true,
+                              );
+                            }
+                          }
+                        },
                       ),
                     ),
                   ),

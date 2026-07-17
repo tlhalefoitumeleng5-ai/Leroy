@@ -10,5 +10,9 @@ abstract class ChatRepository {
     required String chatId,
     required String content,
   });
+  ResultFuture<ChatMessage> regenerateLastReply({
+    required String userId,
+    required String chatId,
+  });
   ResultFuture<void> deleteSession(String userId, String chatId);
 }

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:leroy_ai/core/constants/app_constants.dart';
 import 'package:leroy_ai/core/errors/exceptions.dart';
 import 'package:leroy_ai/features/prompt_library/data/models/prompt_model.dart';
@@ -9,15 +10,26 @@ abstract class PromptRemoteDataSource {
   Future<List<String>> getCategories();
 }
 
-/// Firestore-backed prompt library. Seed documents in the `prompts` collection.
+/// Firestore-backed prompt library. Favorites live under the signed-in user.
 class FirestorePromptDataSource implements PromptRemoteDataSource {
-  FirestorePromptDataSource({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+  FirestorePromptDataSource({FirebaseFirestore? firestore, FirebaseAuth? auth})
+      : _db = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _db;
+  final FirebaseAuth _auth;
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _db.collection(AppConstants.promptsCollection);
+
+  CollectionReference<Map<String, dynamic>>? get _favorites {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return null;
+    return _db
+        .collection(AppConstants.usersCollection)
+        .doc(uid)
+        .collection('favoritePrompts');
+  }
 
   @override
   Future<List<PromptModel>> getPrompts({String? category, String? query}) async {
@@ -27,9 +39,22 @@ class FirestorePromptDataSource implements PromptRemoteDataSource {
         q = q.where('category', isEqualTo: category);
       }
       final snap = await q.get();
-      var list = snap.docs
-          .map((d) => PromptModel.fromMap({...d.data(), 'id': d.id}))
-          .toList();
+      final favoriteIds = <String>{};
+      final favCol = _favorites;
+      if (favCol != null) {
+        final favSnap = await favCol.get();
+        favoriteIds.addAll(favSnap.docs.map((d) => d.id));
+      }
+
+      var list = snap.docs.map((d) {
+        final data = d.data();
+        return PromptModel.fromMap({
+          ...data,
+          'id': d.id,
+          'isFavorite': favoriteIds.contains(d.id),
+        });
+      }).toList();
+
       if (query != null && query.trim().isNotEmpty) {
         final needle = query.toLowerCase();
         list = list
@@ -48,12 +73,28 @@ class FirestorePromptDataSource implements PromptRemoteDataSource {
   @override
   Future<PromptModel> toggleFavorite(String promptId) async {
     try {
+      final favCol = _favorites;
+      if (favCol == null) {
+        throw ServerException('Sign in required to favorite prompts.');
+      }
       final doc = await _col.doc(promptId).get();
       if (!doc.exists) throw ServerException('Prompt not found');
       final data = doc.data()!;
-      final current = data['isFavorite'] as bool? ?? false;
-      await _col.doc(promptId).set({'isFavorite': !current}, SetOptions(merge: true));
-      return PromptModel.fromMap({...data, 'id': promptId, 'isFavorite': !current});
+      final favDoc = favCol.doc(promptId);
+      final exists = (await favDoc.get()).exists;
+      if (exists) {
+        await favDoc.delete();
+      } else {
+        await favDoc.set({
+          'promptId': promptId,
+          'createdAt': DateTime.now().toIso8601String(),
+        });
+      }
+      return PromptModel.fromMap({
+        ...data,
+        'id': promptId,
+        'isFavorite': !exists,
+      });
     } catch (e) {
       if (e is ServerException) rethrow;
       throw ServerException(e.toString());

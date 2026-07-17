@@ -26,7 +26,9 @@ class SubscriptionDataSourceImpl implements SubscriptionDataSource {
   final FirebaseFirestore _db;
   final AiCloudService _ai;
 
-  static const plans = <PlanModel>[
+  /// Canonical fallback used only when Firestore `plans` is empty
+  /// (e.g. before `leroySeedCatalog` has been run).
+  static const fallbackPlans = <PlanModel>[
     PlanModel(
       id: 'free',
       name: 'Free',
@@ -81,7 +83,20 @@ class SubscriptionDataSourceImpl implements SubscriptionDataSource {
   ];
 
   @override
-  Future<List<PlanModel>> getPlans() async => plans;
+  Future<List<PlanModel>> getPlans() async {
+    try {
+      final snap = await _db
+          .collection(AppConstants.plansCollection)
+          .orderBy('sortOrder')
+          .get();
+      if (snap.docs.isEmpty) return fallbackPlans;
+      return snap.docs
+          .map((d) => PlanModel.fromMap({...d.data(), 'id': d.id}))
+          .toList();
+    } catch (_) {
+      return fallbackPlans;
+    }
+  }
 
   @override
   Future<String> getCurrentPlan(String userId) async {

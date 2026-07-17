@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:leroy_ai/features/auth/domain/entities/user_entity.dart';
+import 'package:leroy_ai/shared/providers/app_config_provider.dart';
 import 'package:leroy_ai/shared/providers/dependency_providers.dart';
 
 class AuthState {
@@ -39,26 +42,32 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._ref) : super(const AuthState()) {
-    _bootstrap();
+  AuthNotifier(this._ref) : super(const AuthState(isLoading: true)) {
+    _subscription = _ref
+        .read(authRepositoryProvider)
+        .authStateChanges
+        .listen(_onAuthChanged, onError: (Object e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    });
   }
 
   final Ref _ref;
+  StreamSubscription<UserEntity?>? _subscription;
 
-  Future<void> _bootstrap() async {
-    state = state.copyWith(isLoading: true, clearError: true);
-    final result = await _ref.read(getCurrentUserUseCaseProvider).call();
-    result.fold(
-      (failure) => state = state.copyWith(
-        isLoading: false,
-        error: failure.message,
-      ),
-      (user) => state = state.copyWith(
-        user: user,
-        isLoading: false,
-        clearUser: user == null,
-      ),
+  Future<void> _onAuthChanged(UserEntity? user) async {
+    state = state.copyWith(
+      user: user,
+      isLoading: false,
+      clearUser: user == null,
+      clearError: true,
     );
+    if (user != null) {
+      final notifications = _ref.read(notificationServiceProvider);
+      final token = await notifications.initialize();
+      if (token != null) {
+        await notifications.saveTokenForCurrentUser(token);
+      }
+    }
   }
 
   Future<bool> signIn(String email, String password) async {
@@ -218,6 +227,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   void clearError() => state = state.copyWith(clearError: true);
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {

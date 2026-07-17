@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +25,7 @@ class NotificationService {
       await initialize();
     } else {
       await _messaging.deleteToken();
+      await _clearTokenFromFirestore();
     }
   }
 
@@ -39,8 +42,41 @@ class NotificationService {
     }
 
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+    FirebaseMessaging.onMessage.listen((message) {
+      debugPrint('Foreground FCM: ${message.notification?.title}');
+    });
+
     final token = await _messaging.getToken();
-    debugPrint('FCM token: $token');
+    if (token != null) {
+      await saveTokenForCurrentUser(token);
+    }
+
+    _messaging.onTokenRefresh.listen(saveTokenForCurrentUser);
     return token;
+  }
+
+  Future<void> saveTokenForCurrentUser(String token) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await FirebaseFirestore.instance
+        .collection(AppConstants.usersCollection)
+        .doc(uid)
+        .set({
+      'fcmToken': token,
+      'fcmTokenUpdatedAt': DateTime.now().toIso8601String(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> _clearTokenFromFirestore() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await FirebaseFirestore.instance
+        .collection(AppConstants.usersCollection)
+        .doc(uid)
+        .set({
+      'fcmToken': FieldValue.delete(),
+      'fcmTokenUpdatedAt': DateTime.now().toIso8601String(),
+    }, SetOptions(merge: true));
   }
 }

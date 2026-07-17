@@ -15,6 +15,10 @@ abstract class ChatRemoteDataSource {
     required String chatId,
     required String content,
   });
+  Future<ChatMessageModel> regenerateLastReply({
+    required String userId,
+    required String chatId,
+  });
   Future<void> deleteSession(String userId, String chatId);
 }
 
@@ -155,6 +159,80 @@ class FirestoreChatDataSource implements ChatRemoteDataSource {
   }
 
   @override
+  Future<ChatMessageModel> regenerateLastReply({
+    required String userId,
+    required String chatId,
+  }) async {
+    try {
+      final messages = await getMessages(userId, chatId);
+      if (messages.isEmpty) {
+        throw ServerException('No messages to regenerate.');
+      }
+
+      ChatMessageModel? lastAssistant;
+      ChatMessageModel? lastUser;
+      for (var i = messages.length - 1; i >= 0; i--) {
+        final msg = messages[i];
+        if (lastAssistant == null && msg.role == MessageRole.assistant) {
+          lastAssistant = msg;
+          continue;
+        }
+        if (lastAssistant != null && msg.role == MessageRole.user) {
+          lastUser = msg;
+          break;
+        }
+      }
+      if (lastUser == null) {
+        throw ServerException('No user message found to regenerate from.');
+      }
+
+      final messagesRef = _chats(userId)
+          .doc(chatId)
+          .collection(AppConstants.messagesCollection);
+
+      if (lastAssistant != null) {
+        await messagesRef.doc(lastAssistant.id).delete();
+      }
+
+      final historyMessages = await getMessages(userId, chatId);
+      final history = historyMessages
+          .map((m) => {
+                'role': m.role.name,
+                'content': m.content,
+              })
+          .toList();
+
+      final aiResult = await _ai.chat(
+        message: lastUser.content,
+        chatId: chatId,
+        history: history,
+      );
+      final replyText = aiResult['reply'] as String? ??
+          aiResult['content'] as String? ??
+          '';
+      if (replyText.isEmpty) {
+        throw ServerException('Empty AI response. Check Cloud Function config.');
+      }
+
+      final reply = ChatMessageModel(
+        id: _uuid.v4(),
+        role: MessageRole.assistant,
+        content: replyText,
+        createdAt: DateTime.now(),
+      );
+      await messagesRef.doc(reply.id).set(reply.toMap());
+      await _chats(userId).doc(chatId).set({
+        'updatedAt': DateTime.now().toIso8601String(),
+        'lastMessage': reply.content,
+      }, SetOptions(merge: true));
+      return reply;
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
   Future<void> deleteSession(String userId, String chatId) async {
     try {
       final msgs = await _chats(userId)
@@ -165,6 +243,16 @@ class FirestoreChatDataSource implements ChatRemoteDataSource {
         await doc.reference.delete();
       }
       await _chats(userId).doc(chatId).delete();
+
+      final history = await _db
+          .collection(AppConstants.historyCollection)
+          .where('userId', isEqualTo: userId)
+          .where('refId', isEqualTo: chatId)
+          .where('type', isEqualTo: 'chat')
+          .get();
+      for (final doc in history.docs) {
+        await doc.reference.delete();
+      }
     } catch (e) {
       throw ServerException(e.toString());
     }

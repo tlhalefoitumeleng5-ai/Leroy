@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:leroy_ai/core/theme/app_colors.dart';
+import 'package:leroy_ai/core/utils/media_saver.dart';
 import 'package:leroy_ai/core/utils/snackbar_utils.dart';
 import 'package:leroy_ai/core/utils/validators.dart';
 import 'package:leroy_ai/core/widgets/common_widgets.dart';
 import 'package:leroy_ai/features/image_generator/presentation/providers/image_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class ImageGeneratorScreen extends ConsumerStatefulWidget {
   const ImageGeneratorScreen({super.key});
@@ -137,13 +137,25 @@ class _ImageGeneratorScreenState extends ConsumerState<ImageGeneratorScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () async {
-                        await launchUrl(
-                          Uri.parse(state.latest!.imageUrl),
-                          mode: LaunchMode.externalApplication,
-                        );
+                        try {
+                          await MediaSaver.saveImageFromUrl(
+                            state.latest!.imageUrl,
+                          );
+                          if (context.mounted) {
+                            AppSnackBar.success(context, 'Saved to gallery');
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            AppSnackBar.show(
+                              context,
+                              e.toString(),
+                              isError: true,
+                            );
+                          }
+                        }
                       },
                       icon: const Icon(Icons.download_outlined),
-                      label: const Text('Save / Open'),
+                      label: const Text('Save'),
                     ),
                   ),
                   const SizedBox(width: 8),

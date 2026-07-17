@@ -17,6 +17,7 @@ import 'package:leroy_ai/features/image_generator/presentation/screens/image_gen
 import 'package:leroy_ai/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:leroy_ai/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:leroy_ai/features/profile/presentation/screens/profile_screen.dart';
+import 'package:leroy_ai/features/prompt_library/presentation/screens/prompt_library_screen.dart';
 import 'package:leroy_ai/features/settings/presentation/screens/settings_screen.dart';
 import 'package:leroy_ai/features/splash/presentation/screens/splash_screen.dart';
 import 'package:leroy_ai/features/subscription/presentation/screens/subscription_screen.dart';
@@ -129,6 +130,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.templates,
         builder: (_, __) => const TemplatesScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.promptLibrary,
+        builder: (_, __) => const PromptLibraryScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

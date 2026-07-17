@@ -57,6 +57,21 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
+  ResultFuture<ChatMessage> regenerateLastReply({
+    required String userId,
+    required String chatId,
+  }) async {
+    try {
+      return Right(await _remote.regenerateLastReply(
+        userId: userId,
+        chatId: chatId,
+      ));
+    } catch (e) {
+      return Left(mapExceptionToFailure(e));
+    }
+  }
+
+  @override
   ResultFuture<void> deleteSession(String userId, String chatId) async {
     try {
       await _remote.deleteSession(userId, chatId);

@@ -9,4 +9,17 @@ class PlanModel extends PlanEntity {
     required super.features,
     super.isPopular,
   });
+
+  factory PlanModel.fromMap(Map<String, dynamic> map) {
+    return PlanModel(
+      id: map['id'] as String? ?? '',
+      name: map['name'] as String? ?? '',
+      priceLabel: map['priceLabel'] as String? ?? '',
+      period: map['period'] as String? ?? '/month',
+      features: (map['features'] as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toList(),
+      isPopular: map['isPopular'] as bool? ?? false,
+    );
+  }
 }

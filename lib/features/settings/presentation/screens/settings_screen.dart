@@ -54,7 +54,7 @@ class SettingsScreen extends ConsumerWidget {
           SwitchListTile(
             title: const Text('Push notifications'),
             value: enabled,
-            activeColor: AppColors.teal,
+            activeThumbColor: AppColors.teal,
             onChanged: (v) async {
               await ref
                   .read(notificationsEnabledProvider.notifier)

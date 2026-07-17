@@ -202,17 +202,18 @@ class HomeScreen extends ConsumerWidget {
                     onTap: () => context.go(AppRoutes.history),
                   ),
                   FeatureTile(
+                    title: 'Prompts',
+                    subtitle: 'Creative prompt library',
+                    icon: Icons.menu_book_outlined,
+                    accent: const Color(0xFF14B8A6),
+                    onTap: () => context.push(AppRoutes.promptLibrary),
+                  ),
+                  FeatureTile(
                     title: 'Subscription',
                     subtitle: 'Free to Business',
                     icon: Icons.workspace_premium_outlined,
                     accent: const Color(0xFF6366F1),
                     onTap: () => context.push(AppRoutes.subscription),
-                  ),
-                  FeatureTile(
-                    title: 'Settings',
-                    subtitle: 'Theme, privacy, about',
-                    icon: Icons.settings_outlined,
-                    onTap: () => context.push(AppRoutes.settings),
                   ),
                 ]
                     .animate(interval: 60.ms)
