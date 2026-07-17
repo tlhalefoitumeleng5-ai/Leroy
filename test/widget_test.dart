@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:leroy_ai/core/utils/validators.dart';
 import 'package:leroy_ai/features/auth/data/models/user_model.dart';
 import 'package:leroy_ai/features/prompt_library/data/datasources/prompt_remote_datasource.dart';
+import 'package:leroy_ai/features/services/data/datasources/services_datasource.dart';
 
 void main() {
   group('Validators', () {
@@ -50,6 +51,33 @@ void main() {
 
       final toggled = await source.toggleFavorite(marketing.first.id);
       expect(toggled.isFavorite, isTrue);
+    });
+  });
+
+  group('Services catalog', () {
+    test('includes site services plus apps and websites in Rands', () async {
+      const source = ServicesDataSource();
+      final services = await source.getServices();
+
+      expect(services.length, 6);
+      expect(
+        services.map((s) => s.title),
+        containsAll([
+          'AI Chatbots',
+          'WhatsApp Automation',
+          'Lead Generation Systems',
+          'Business Process Automation',
+          'We Build Apps',
+          'We Build Websites',
+        ]),
+      );
+
+      final apps = services.firstWhere((s) => s.id == 'we-build-apps');
+      final websites =
+          services.firstWhere((s) => s.id == 'we-build-websites');
+      expect(apps.priceLabel, 'R8,000 setup + R600/month');
+      expect(websites.priceLabel, 'R3,500 setup + R400/month');
+      expect(services.every((s) => s.priceLabel.startsWith('R')), isTrue);
     });
   });
 }

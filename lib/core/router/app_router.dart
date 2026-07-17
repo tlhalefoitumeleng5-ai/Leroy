@@ -15,6 +15,7 @@ import 'package:leroy_ai/features/profile/presentation/screens/profile_screen.da
 import 'package:leroy_ai/features/prompt_library/presentation/screens/prompt_library_screen.dart';
 import 'package:leroy_ai/features/settings/presentation/screens/settings_screen.dart';
 import 'package:leroy_ai/features/splash/presentation/screens/splash_screen.dart';
+import 'package:leroy_ai/features/services/presentation/screens/services_screen.dart';
 import 'package:leroy_ai/features/subscription/presentation/screens/subscription_screen.dart';
 import 'package:leroy_ai/shared/providers/app_config_provider.dart';
 
@@ -106,6 +107,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.subscription,
         builder: (_, __) => const SubscriptionScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.services,
+        builder: (_, __) => const ServicesScreen(),
       ),
       GoRoute(
         path: AppRoutes.settings,
