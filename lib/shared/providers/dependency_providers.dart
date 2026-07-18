@@ -19,6 +19,10 @@ import 'package:leroy_ai/features/subscription/data/datasources/subscription_dat
 import 'package:leroy_ai/features/subscription/data/repositories/subscription_repository_impl.dart';
 import 'package:leroy_ai/features/subscription/domain/repositories/subscription_repository.dart';
 import 'package:leroy_ai/features/subscription/domain/usecases/subscription_usecases.dart';
+import 'package:leroy_ai/features/video_studio/data/repositories/video_studio_repository_impl.dart';
+import 'package:leroy_ai/features/video_studio/data/services/video_render_engine.dart';
+import 'package:leroy_ai/features/video_studio/domain/repositories/video_studio_repository.dart';
+import 'package:leroy_ai/features/video_studio/domain/usecases/video_studio_usecases.dart';
 import 'package:leroy_ai/shared/providers/app_config_provider.dart';
 
 /// Dependency injection via Riverpod — swap demo/Firebase based on config.
@@ -145,4 +149,29 @@ final getCurrentPlanUseCaseProvider = Provider(
 );
 final selectPlanUseCaseProvider = Provider(
   (ref) => SelectPlanUseCase(ref.watch(subscriptionRepositoryProvider)),
+);
+
+final videoRenderEngineProvider = Provider<VideoRenderEngine>((ref) {
+  return VideoRenderEngine();
+});
+
+final videoStudioRepositoryProvider = Provider<VideoStudioRepository>((ref) {
+  return VideoStudioRepositoryImpl(
+    ref.watch(videoRenderEngineProvider),
+    ref.watch(sharedPreferencesProvider),
+  );
+});
+
+final loadVideoLibraryUseCaseProvider = Provider(
+  (ref) => LoadVideoLibraryUseCase(ref.watch(videoStudioRepositoryProvider)),
+);
+final renderVideoUseCaseProvider = Provider(
+  (ref) => RenderVideoUseCase(ref.watch(videoStudioRepositoryProvider)),
+);
+final renderAllVideosUseCaseProvider = Provider(
+  (ref) => RenderAllVideosUseCase(ref.watch(videoStudioRepositoryProvider)),
+);
+final deleteGeneratedVideoUseCaseProvider = Provider(
+  (ref) =>
+      DeleteGeneratedVideoUseCase(ref.watch(videoStudioRepositoryProvider)),
 );

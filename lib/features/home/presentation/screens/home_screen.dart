@@ -85,7 +85,7 @@ class HomeScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Start a conversation or generate a new image.',
+                        'Chat, create images, or render AI marketing videos.',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.white.withValues(alpha: 0.9),
                         ),
@@ -111,6 +111,15 @@ class HomeScreen extends ConsumerWidget {
                             onPressed: () =>
                                 context.push(AppRoutes.imageGenerator),
                             child: const Text('Generate image'),
+                          ),
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.white70),
+                            ),
+                            onPressed: () =>
+                                context.push(AppRoutes.videoStudio),
+                            child: const Text('Video Studio'),
                           ),
                         ],
                       ),
@@ -148,6 +157,13 @@ class HomeScreen extends ConsumerWidget {
                     icon: Icons.palette_outlined,
                     accent: AppColors.coral,
                     onTap: () => context.push(AppRoutes.imageGenerator),
+                  ),
+                  FeatureTile(
+                    title: 'Video Studio',
+                    subtitle: 'Generate 50 AI videos',
+                    icon: Icons.smart_display_outlined,
+                    accent: const Color(0xFF0EA5E9),
+                    onTap: () => context.push(AppRoutes.videoStudio),
                   ),
                   FeatureTile(
                     title: 'Prompt Library',

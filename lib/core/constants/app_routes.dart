@@ -11,6 +11,7 @@ class AppRoutes {
   static const String chat = '/chat';
   static const String chatDetail = '/chat/:chatId';
   static const String imageGenerator = '/image-generator';
+  static const String videoStudio = '/video-studio';
   static const String promptLibrary = '/prompts';
   static const String profile = '/profile';
   static const String subscription = '/subscription';
