@@ -16,6 +16,7 @@ import 'package:leroy_ai/features/prompt_library/presentation/screens/prompt_lib
 import 'package:leroy_ai/features/settings/presentation/screens/settings_screen.dart';
 import 'package:leroy_ai/features/splash/presentation/screens/splash_screen.dart';
 import 'package:leroy_ai/features/subscription/presentation/screens/subscription_screen.dart';
+import 'package:leroy_ai/features/video_studio/presentation/screens/video_studio_screen.dart';
 import 'package:leroy_ai/shared/providers/app_config_provider.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -94,6 +95,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.imageGenerator,
         builder: (_, __) => const ImageGeneratorScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.videoStudio,
+        builder: (_, __) => const VideoStudioScreen(),
       ),
       GoRoute(
         path: AppRoutes.promptLibrary,
