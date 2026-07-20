@@ -54,8 +54,9 @@ const MODES: Array<{ id: TutorMode; label: string }> = [
   { id: 'homework', label: 'Homework' },
   { id: 'exam', label: 'Exam prep' },
   { id: 'quiz', label: 'Quiz' },
+  { id: 'test', label: 'Test' },
   { id: 'flashcards', label: 'Flashcards' },
-  { id: 'summary', label: 'Summary' },
+  { id: 'summary', label: 'Study notes' },
   { id: 'study_plan', label: 'Study plan' },
   { id: 'revision', label: 'Revision' },
 ]
@@ -85,6 +86,8 @@ export function StudentAiTutorPage() {
   const [attachMenu, setAttachMenu] = useState<AttachMenu>('closed')
   const [attachments, setAttachments] = useState<TutorAttachment[]>([])
   const [providerHint, setProviderHint] = useState<'openai' | 'fallback' | null>(null)
+  const [streamingText, setStreamingText] = useState('')
+  const [modelUsed, setModelUsed] = useState<string | undefined>()
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
@@ -97,20 +100,23 @@ export function StudentAiTutorPage() {
 
   useEffect(() => () => stopSpeaking(), [])
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  })
-
   const student = user ? api.getStudentByProfile(user.id) : undefined
   const gradeFromStudent = student?.gradeId ? api.getGrade(student.gradeId)?.gradeNumber : undefined
+  const sessionsPreview = student ? api.listAiSessions(student.id) : []
+  const activePreviewId = sessionId || sessionsPreview[0]?.id || ''
+  const messageCount = activePreviewId ? api.listAiMessages(activePreviewId).length : 0
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [streamingText, busy, sessionId, attachments.length, messageCount])
 
   useEffect(() => {
     if (gradeFromStudent) setGradeLevel(String(gradeFromStudent))
   }, [gradeFromStudent])
 
   if (!user) return null
-  const sessions = student ? api.listAiSessions(student.id) : []
-  const activeId = sessionId || sessions[0]?.id || ''
+  const sessions = sessionsPreview
+  const activeId = activePreviewId
   const messages = activeId ? api.listAiMessages(activeId) : []
   const enrolled = api.listClassSubjects().filter((cs) => cs.classId === student?.classId)
 
@@ -279,35 +285,42 @@ export function StudentAiTutorPage() {
         : ''
 
     setBusy(true)
+    setStreamingText('')
     stopSpeaking()
     try {
       const matched = api.listSubjects().find((s) => s.name === subjectName || s.id === subjectId)
-      const res = await api.askAiTutor({
-        studentId: student.id,
-        subjectId: matched?.id || subjectId || undefined,
-        question:
-          (question.trim() ||
-            (imageDataUrl
-              ? 'Please read this image carefully (including handwriting) and explain / solve it step-by-step.'
-              : documentText
-                ? 'Please read the uploaded document(s) and teach me the key points. Answer questions about the content.'
-                : 'Hello')) + extraImageNote,
-        sessionId: activeId || undefined,
-        gradeLevel: `Grade ${gradeLevel}`,
-        languageCode,
-        mode,
-        imageDataUrl,
-        documentText: documentText || undefined,
-        learnerName: user?.profile.firstName,
-        attachmentLabel: ready.map((a) => a.fileName).join(', ') || undefined,
-      })
+      const res = await api.askAiTutorStream(
+        {
+          studentId: student.id,
+          subjectId: matched?.id || subjectId || undefined,
+          question:
+            (question.trim() ||
+              (imageDataUrl
+                ? 'Please read this image carefully (including handwriting) and explain / solve it step-by-step.'
+                : documentText
+                  ? 'Please read the uploaded document(s) and teach me the key points. Answer questions about the content.'
+                  : 'Hello')) + extraImageNote,
+          sessionId: activeId || undefined,
+          gradeLevel: `Grade ${gradeLevel}`,
+          languageCode,
+          mode,
+          imageDataUrl,
+          documentText: documentText || undefined,
+          learnerName: user?.profile.firstName,
+          attachmentLabel: ready.map((a) => a.fileName).join(', ') || undefined,
+        },
+        (full) => setStreamingText(full),
+      )
       setSessionId(res.sessionId)
       setProviderHint(res.provider)
+      setModelUsed(res.model)
       setQuestion('')
       setAttachments([])
+      setStreamingText('')
       if (speakReplies) speakText(res.reply, languageCode)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Tutor unavailable')
+      toast.error(err instanceof Error ? err.message : 'Assistant unavailable')
+      setStreamingText('')
     } finally {
       setBusy(false)
     }
@@ -316,14 +329,16 @@ export function StudentAiTutorPage() {
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4 animate-fade-in pb-6">
       <PageHeader
-        title="AI Tutor"
-        description="ChatGPT-style CAPS assistant · photos, PDFs, Office docs, voice"
+        title="AI Assistant"
+        description="GPT-5.5 CAPS assistant · streaming · photos, docs & voice"
         actions={
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary" className="gap-1">
               <Sparkles className="h-3 w-3" /> CAPS · 12 languages
             </Badge>
-            {providerHint === 'openai' ? <Badge variant="success">GPT-4o live</Badge> : null}
+            {providerHint === 'openai' ? (
+              <Badge variant="success">{modelUsed || 'GPT-5.5'} live</Badge>
+            ) : null}
             {providerHint === 'fallback' ? <Badge variant="warning">Study mode</Badge> : null}
           </div>
         }
@@ -395,9 +410,9 @@ export function StudentAiTutorPage() {
                 <Bot className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-sm">Leroy CAPS Tutor</p>
+                <p className="truncate font-semibold text-sm">Leroy AI Assistant</p>
                 <p className="truncate text-[11px] text-muted-foreground">
-                  Maths · Sciences · Languages · Commerce · CAT/IT · LO
+                  GPT-5.5 · Maths · Sciences · Languages · Essays · Coding
                 </p>
               </div>
               <Button
@@ -507,7 +522,7 @@ export function StudentAiTutorPage() {
                   >
                     {!mine ? (
                       <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                        <Bot className="h-3 w-3" /> AI Tutor
+                        <Bot className="h-3 w-3" /> AI Assistant
                       </p>
                     ) : null}
                     <div className="whitespace-pre-wrap">{m.content}</div>
@@ -535,11 +550,21 @@ export function StudentAiTutorPage() {
 
             {busy ? (
               <div className="flex justify-start">
-                <div className="rounded-2xl rounded-bl-md border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    AI Tutor is typing…
-                  </span>
+                <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-border bg-card px-3.5 py-2.5 text-sm shadow-sm sm:max-w-[80%]">
+                  <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                    <Bot className="h-3 w-3" /> AI Assistant
+                  </p>
+                  {streamingText ? (
+                    <div className="whitespace-pre-wrap leading-relaxed">
+                      {streamingText}
+                      <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-primary/70 align-middle" />
+                    </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      AI Assistant is typing…
+                    </span>
+                  )}
                 </div>
               </div>
             ) : null}
@@ -673,13 +698,13 @@ export function StudentAiTutorPage() {
               onChange={(e) => void addFiles(e.target.files)}
             />
 
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-1.5 sm:gap-2">
               <Button
                 type="button"
                 size="icon"
                 variant={attachMenu === 'open' ? 'default' : 'outline'}
                 className="h-11 w-11 shrink-0 rounded-full"
-                aria-label="Attach"
+                aria-label="Attach files"
                 onClick={() => setAttachMenu((m) => (m === 'open' ? 'closed' : 'open'))}
               >
                 {attachMenu === 'open' ? <X className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
@@ -687,9 +712,22 @@ export function StudentAiTutorPage() {
               <Button
                 type="button"
                 size="icon"
+                variant="outline"
+                className="h-11 w-11 shrink-0 rounded-full"
+                aria-label="Take photo"
+                onClick={() => {
+                  setAttachMenu('closed')
+                  cameraRef.current?.click()
+                }}
+              >
+                <Camera className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
                 variant={listening ? 'destructive' : 'outline'}
                 className="h-11 w-11 shrink-0 rounded-full"
-                aria-label="Voice typing"
+                aria-label="Voice input"
                 onClick={toggleLiveMic}
               >
                 {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -697,7 +735,7 @@ export function StudentAiTutorPage() {
               <Textarea
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Message AI Tutor…"
+                placeholder="Message AI Assistant…"
                 className="min-h-11 max-h-36 flex-1 resize-y rounded-2xl border-border bg-muted/30 px-3 py-2.5"
                 rows={1}
                 onKeyDown={(e) => {
@@ -720,7 +758,7 @@ export function StudentAiTutorPage() {
               </Button>
             </div>
             <p className="mt-2 text-[10px] text-muted-foreground">
-              {fullName(user.profile.firstName, user.profile.lastName)} · Tap + for camera, files & voice · Shift+Enter
+              {fullName(user.profile.firstName, user.profile.lastName)} · Attach · Camera · Mic · Send · Shift+Enter
               for new line
             </p>
             {/* Hidden icons kept for tree-shaking clarity of supported types */}

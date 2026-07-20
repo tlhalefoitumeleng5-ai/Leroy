@@ -3,7 +3,7 @@
 ALTER TABLE schools
   ADD COLUMN IF NOT EXISTS openai_api_key TEXT,
   ADD COLUMN IF NOT EXISTS ai_tutor_enabled BOOLEAN NOT NULL DEFAULT true,
-  ADD COLUMN IF NOT EXISTS ai_tutor_model TEXT DEFAULT 'gpt-4o';
+  ADD COLUMN IF NOT EXISTS ai_tutor_model TEXT DEFAULT 'gpt-5.5';
 
 ALTER TABLE ai_tutor_sessions
   ADD COLUMN IF NOT EXISTS grade_level TEXT,

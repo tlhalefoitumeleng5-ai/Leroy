@@ -1,7 +1,7 @@
 /**
- * World-class CAPS AI Tutor for South African schools (Grade R–12).
- * Uses GPT-4o (vision + chat) when an API key is available; otherwise
- * an honest enhanced CAPS study assistant with OCR/PDF extraction still works.
+ * Leroy AI Assistant — CAPS-aligned GPT for South African schools (Grade R–12).
+ * Prefers GPT-5.5 (vision + chat + streaming); falls back through gpt-5 → gpt-4.1 → gpt-4o.
+ * Without an API key, an honest CAPS study assistant still works with file extraction.
  */
 
 export const CAPS_PHASES = [
@@ -75,6 +75,7 @@ export type TutorMode =
   | 'homework'
   | 'exam'
   | 'quiz'
+  | 'test'
   | 'flashcards'
   | 'summary'
   | 'study_plan'
@@ -119,44 +120,44 @@ export function buildCapsSystemPrompt(opts: {
     SA_OFFICIAL_LANGUAGES.find((l) => l.code === opts.languageCode)?.name ||
     'the learner’s preferred South African official language (detect from their message)'
   const modeHints: Record<TutorMode, string> = {
-    chat: 'Hold a natural tutoring conversation. Remember prior turns in this chat.',
+    chat: 'Hold a natural assistant conversation. Remember prior turns in this chat.',
     explain: 'Explain the topic in simple language with analogies a South African learner will recognise.',
     homework: 'Help with homework: guide method first, check understanding, then support the answer.',
     exam: 'Focus on exam technique, mark allocation, and CAPS-style answers.',
     quiz: 'Generate a short quiz (5–8 questions) with answers hidden under an "Answers" section.',
+    test: 'Generate a longer CAPS-style test/assessment (10–15 questions) with mark allocations and a full memo under "Memo".',
     flashcards: 'Produce 8–12 flashcards as Q → A pairs for active recall.',
-    summary: 'Produce clear revision notes / summary with headings and key terms.',
+    summary: 'Produce clear revision / study notes with headings, key terms, and exam tips.',
     study_plan: 'Build a realistic weekly study plan with CAPS topics and time blocks.',
     revision: 'Create a revision pack: key facts, common mistakes, and practice items.',
   }
 
   return [
-    'You are Leroy CAPS Tutor — the best educational AI assistant for South African schools.',
-    'You are as capable, clear, and helpful as ChatGPT, specialised for CAPS (Curriculum and Assessment Policy Statement).',
+    'You are Leroy AI Assistant — a full educational AI for South African schools, as capable as ChatGPT.',
+    'You specialise in CAPS (Curriculum and Assessment Policy Statement) across all subjects and grades.',
     '',
     'SCOPE:',
-    '- Support EVERY school subject from Grade R to Grade 12.',
-    `- Core subjects include: ${CAPS_SUBJECTS.join(', ')}.`,
-    '- Fully align with South African CAPS: Foundation, Intermediate, Senior, and FET phases.',
+    '- Answer ANY subject taught in South African schools from Grade R to Grade 12.',
+    `- Subjects include (not limited to): ${CAPS_SUBJECTS.join(', ')}.`,
+    '- Align with CAPS phases: Foundation, Intermediate, Senior, and FET.',
     '- For FET, respect typical SBA (~25%) and exam (~75%) weightings unless the learner specifies otherwise.',
     '',
     'LANGUAGES:',
     `- Reply fluently in: ${lang}.`,
-    '- You understand and can reply in all 12 official South African languages: English, Afrikaans, isiZulu, isiXhosa, Sesotho, Sepedi, Setswana, Xitsonga, Tshivenda, Siswati, isiNdebele, and written support for SASL concepts.',
+    '- Support all 12 official South African languages: English, Afrikaans, isiZulu, isiXhosa, Sesotho, Sepedi, Setswana, Xitsonga, Tshivenda, Siswati, isiNdebele, and written support for SASL.',
     '- Match the learner’s language automatically if they write in another official language.',
     '',
-    'TEACHING STYLE:',
-    '- Be warm, encouraging, patient, and professional — like an excellent South African teacher.',
-    '- Explain difficult ideas in simple language first, then deepen.',
-    '- For Mathematics and Physical Sciences: ALWAYS show clear step-by-step working.',
-    '- Help with homework, assignments, projects, exam prep, quizzes, flashcards, summaries, and study plans.',
-    '- Prefer teaching understanding over dumping final answers; still provide complete worked solutions when asked.',
-    '- When an image is attached: carefully read printed AND handwritten notes, diagrams, and equations.',
-    '- When a document (PDF, Word, Excel, PowerPoint, text) is attached: use its content to answer accurately.',
+    'CAPABILITIES:',
+    '- Explain answers step by step (always).',
+    '- Solve Mathematics with full working shown line by line.',
+    '- Generate quizzes, tests, flashcards, and study notes on request.',
+    '- Help with essays (planning, PEEL, structure, editing), coding (explain + debug), and research (outlines, sources, CAPS-aligned notes).',
+    '- Analyse homework photos (printed + handwritten), PDFs, DOCX, and text files.',
+    '- Prefer teaching understanding; still give complete worked solutions when asked.',
     '',
     'INTEGRITY (critical):',
     '- NEVER invent facts, formulas, historical dates, or syllabus claims.',
-    '- If you are unsure, say so honestly and suggest how to verify (textbook, CAPS document, teacher).',
+    '- If unsure, say so and suggest how to verify (textbook, CAPS document, teacher).',
     '- If an image/PDF is unreadable, say so and ask for a clearer upload.',
     '',
     'CONTEXT:',
@@ -165,7 +166,7 @@ export function buildCapsSystemPrompt(opts: {
     opts.subjectName ? `- Subject focus: ${opts.subjectName}` : '- Subject: detect from question',
     `- Mode: ${opts.mode || 'chat'} — ${modeHints[opts.mode || 'chat']}`,
     '',
-    'Remember the full conversation history provided and stay consistent with earlier explanations.',
+    'Remember the full conversation history and stay consistent with earlier explanations.',
   ].join('\n')
 }
 
@@ -173,10 +174,12 @@ function modeInstruction(mode: TutorMode | undefined, question: string) {
   switch (mode) {
     case 'quiz':
       return `Create a CAPS-aligned quiz based on this request:\n${question}`
+    case 'test':
+      return `Create a CAPS-aligned test/assessment (with mark allocations and a full memo) based on this request:\n${question}`
     case 'flashcards':
       return `Create flashcards based on this request:\n${question}`
     case 'summary':
-      return `Create revision notes / a summary based on this request:\n${question}`
+      return `Create revision notes / study notes based on this request:\n${question}`
     case 'study_plan':
       return `Create a study plan based on this request:\n${question}`
     case 'revision':
@@ -222,25 +225,31 @@ export function generateCapsTutorReply(req: TutorRequest): string {
         '5. Try a short practice item to check understanding.',
       ]
 
-  if (req.mode === 'quiz') {
+  if (req.mode === 'quiz' || req.mode === 'test') {
+    const title = req.mode === 'test' ? 'CAPS Test' : 'CAPS Quiz'
     return [
-      `CAPS Quiz · ${subject} · ${lang}`,
+      `${title} · ${subject} · ${lang}`,
       '',
-      '1) Define the main concept in one sentence.',
-      '2) Give one real-life South African example.',
-      '3) True/False: CAPS values understanding, not only memorisation.',
-      '4) List two common mistakes learners make on this topic.',
-      '5) Write a short paragraph applying the idea.',
+      '1) Define the main concept in one sentence. (2)',
+      '2) Give one real-life South African example. (2)',
+      '3) True/False: CAPS values understanding, not only memorisation. (1)',
+      '4) List two common mistakes learners make on this topic. (4)',
+      '5) Write a short paragraph applying the idea. (6)',
+      req.mode === 'test'
+        ? '6) Extended response: explain the topic with an example and a diagram description. (10)\n7) Application question linked to a CAPS exam skill. (5)'
+        : '',
       '',
-      'Answers:',
-      '1) Learner’s own accurate definition.',
+      req.mode === 'test' ? 'Memo:' : 'Answers:',
+      '1) Accurate definition in the learner’s words.',
       '2) Context-appropriate local example.',
       '3) True.',
       '4) e.g. skipping steps; mixing definitions.',
       '5) Clear PEEL/structured response.',
       '',
-      'Note: For richer adaptive quizzes powered by GPT-4o, ask your school admin to enable the OpenAI key.',
-    ].join('\n')
+      'Note: For richer GPT-5.5 quizzes and tests, ask your school admin to enable the OpenAI key (Admin → WhatsApp & AI).',
+    ]
+      .filter(Boolean)
+      .join('\n')
   }
 
   if (req.mode === 'flashcards') {
@@ -259,10 +268,10 @@ export function generateCapsTutorReply(req: TutorRequest): string {
   }
 
   return [
-    `Leroy CAPS Tutor · ${subject}`,
+    `Leroy AI Assistant · ${subject}`,
     `Language: ${lang}`,
     '',
-    'Sawubona! I can help with CAPS topics from Grade R–12.',
+    'Sawubona! I can help with any CAPS subject from Grade R–12.',
     '',
     `Your request: “${q.slice(0, 500)}”`,
     extra ? `\n${extra}\n` : '',
@@ -271,33 +280,178 @@ export function generateCapsTutorReply(req: TutorRequest): string {
     '',
     'Integrity: I will not invent syllabus details. If something needs your textbook or teacher confirmation, I will say so.',
     '',
-    'Tip: Upload a photo of your homework or a PDF for guided help. For ChatGPT-level vision and multilingual tutoring, your school should configure an OpenAI API key (Admin → AI Tutor).',
+    'Tip: Use the camera for homework photos, attach PDFs/DOCX, or speak with the mic. For full GPT-5.5 vision and multilingual help, your school should set an OpenAI API key (Admin → WhatsApp & AI).',
     '',
-    'Ask me to: explain · quiz me · make flashcards · summarise · build a study plan.',
+    'Ask me to: explain step-by-step · quiz/test me · make flashcards · write study notes · help with essays, coding or research.',
   ].join('\n')
 }
 
-async function callOpenAiChat(apiKey: string, system: string, messages: Array<Record<string, unknown>>) {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      temperature: 0.35,
-      messages: [{ role: 'system', content: system }, ...messages],
-    }),
-  })
-  if (!res.ok) {
-    const errText = await res.text()
-    throw new Error(`OpenAI error ${res.status}: ${errText.slice(0, 200)}`)
+export const AI_TUTOR_MODELS = ['gpt-5.5', 'gpt-5', 'gpt-4.1', 'gpt-4o'] as const
+
+export function preferredTutorModel(configured?: string) {
+  if (configured && configured.trim()) return configured.trim()
+  return (import.meta.env.VITE_OPENAI_MODEL as string | undefined)?.trim() || 'gpt-5.5'
+}
+
+async function callOpenAiChat(
+  apiKey: string,
+  system: string,
+  messages: Array<Record<string, unknown>>,
+  modelPreference?: string,
+) {
+  const candidates = [
+    preferredTutorModel(modelPreference),
+    ...AI_TUTOR_MODELS.filter((m) => m !== preferredTutorModel(modelPreference)),
+  ]
+  let lastError = 'OpenAI unavailable'
+  for (const model of candidates) {
+    try {
+      const body: Record<string, unknown> = {
+        model,
+        messages: [{ role: 'system', content: system }, ...messages],
+      }
+      // gpt-5.x may reject temperature; send only for classic chat models
+      if (model.startsWith('gpt-4')) body.temperature = 0.35
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const errText = await res.text()
+        lastError = `OpenAI ${model}: ${errText.slice(0, 180)}`
+        continue
+      }
+      const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+      const text = data.choices?.[0]?.message?.content?.trim()
+      if (!text) {
+        lastError = `Empty response from ${model}`
+        continue
+      }
+      return { text, model }
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : 'Network error'
+    }
   }
-  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
-  const text = data.choices?.[0]?.message?.content?.trim()
-  if (!text) throw new Error('Empty model response')
-  return text
+  throw new Error(lastError)
+}
+
+function buildOpenAiMessages(req: TutorRequest) {
+  const history = (req.history ?? []).slice(-24)
+  const messages: Array<Record<string, unknown>> = []
+  for (const h of history) {
+    if (h.imageDataUrl) {
+      messages.push({
+        role: h.role,
+        content: [
+          { type: 'text', text: h.content },
+          { type: 'image_url', image_url: { url: h.imageDataUrl, detail: 'low' } },
+        ],
+      })
+    } else {
+      messages.push({ role: h.role, content: h.content })
+    }
+  }
+  messages.push({ role: 'user', content: buildUserContent(req) })
+  return messages
+}
+
+/** Parse OpenAI Chat Completions SSE body into a full reply. */
+export async function parseOpenAiSseStream(
+  body: ReadableStream<Uint8Array>,
+  onDelta: (chunk: string, full: string) => void,
+): Promise<string> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let full = ''
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) continue
+      const payload = trimmed.slice(5).trim()
+      if (payload === '[DONE]') continue
+      try {
+        const json = JSON.parse(payload) as {
+          choices?: Array<{ delta?: { content?: string } }>
+        }
+        const delta = json.choices?.[0]?.delta?.content
+        if (delta) {
+          full += delta
+          onDelta(delta, full)
+        }
+      } catch {
+        // ignore partial JSON
+      }
+    }
+  }
+  return full.trim()
+}
+
+/** Stream GPT replies token-by-token (Chat Completions SSE). */
+export async function streamTutorReply(
+  req: TutorRequest & { model?: string },
+  onDelta: (chunk: string, full: string) => void,
+): Promise<{ reply: string; provider: 'openai' | 'fallback'; model?: string }> {
+  const system = buildCapsSystemPrompt(req)
+  const apiKey =
+    req.apiKey || (import.meta.env.VITE_OPENAI_API_KEY as string | undefined) || undefined
+  if (!apiKey) {
+    const reply = generateCapsTutorReply(req)
+    onDelta(reply, reply)
+    return { reply, provider: 'fallback' }
+  }
+
+  const candidates = [
+    preferredTutorModel(req.model),
+    ...AI_TUTOR_MODELS.filter((m) => m !== preferredTutorModel(req.model)),
+  ]
+  const messages = buildOpenAiMessages(req)
+  let lastError = 'OpenAI stream unavailable'
+
+  for (const model of candidates) {
+    try {
+      const body: Record<string, unknown> = {
+        model,
+        stream: true,
+        messages: [{ role: 'system', content: system }, ...messages],
+      }
+      if (model.startsWith('gpt-4')) body.temperature = 0.35
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok || !res.body) {
+        lastError = `OpenAI ${model}: ${(await res.text()).slice(0, 180)}`
+        continue
+      }
+
+      const full = await parseOpenAiSseStream(res.body, onDelta)
+      if (full) return { reply: full, provider: 'openai', model }
+      lastError = `Empty stream from ${model}`
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : 'Stream error'
+    }
+  }
+
+  const reply =
+    generateCapsTutorReply(req) + `\n\n(AI provider temporarily unavailable: ${lastError})`
+  onDelta(reply, reply)
+  return { reply, provider: 'fallback' }
 }
 
 function buildUserContent(req: TutorRequest) {
@@ -317,9 +471,10 @@ function buildUserContent(req: TutorRequest) {
   return text
 }
 
-export async function generateTutorReply(req: TutorRequest): Promise<{ reply: string; provider: 'openai' | 'fallback' }> {
+export async function generateTutorReply(
+  req: TutorRequest & { model?: string },
+): Promise<{ reply: string; provider: 'openai' | 'fallback'; model?: string }> {
   const system = buildCapsSystemPrompt(req)
-  const history = (req.history ?? []).slice(-24)
   const apiKey =
     req.apiKey ||
     (import.meta.env.VITE_OPENAI_API_KEY as string | undefined) ||
@@ -327,23 +482,9 @@ export async function generateTutorReply(req: TutorRequest): Promise<{ reply: st
 
   if (apiKey) {
     try {
-      const messages: Array<Record<string, unknown>> = []
-      for (const h of history) {
-        if (h.imageDataUrl) {
-          messages.push({
-            role: h.role,
-            content: [
-              { type: 'text', text: h.content },
-              { type: 'image_url', image_url: { url: h.imageDataUrl, detail: 'low' } },
-            ],
-          })
-        } else {
-          messages.push({ role: h.role, content: h.content })
-        }
-      }
-      messages.push({ role: 'user', content: buildUserContent(req) })
-      const reply = await callOpenAiChat(apiKey, system, messages)
-      return { reply, provider: 'openai' }
+      const messages = buildOpenAiMessages(req)
+      const { text, model } = await callOpenAiChat(apiKey, system, messages, req.model)
+      return { reply: text, provider: 'openai', model }
     } catch (err) {
       console.warn('OpenAI tutor failed, using fallback', err)
       return {

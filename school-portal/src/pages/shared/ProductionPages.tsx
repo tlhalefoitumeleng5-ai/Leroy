@@ -486,7 +486,7 @@ export function AdminAiTutorSettings() {
   useApiRefresh()
   const school = api.getDb().school
   const [enabled, setEnabled] = useState(school.aiTutorEnabled ?? true)
-  const [model, setModel] = useState(school.aiTutorModel ?? 'gpt-4o')
+  const [model, setModel] = useState(school.aiTutorModel ?? 'gpt-5.5')
   const [apiKey, setApiKey] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -494,7 +494,7 @@ export function AdminAiTutorSettings() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Sparkles className="h-4 w-4 text-primary" /> AI Tutor (GPT-4o)
+          <Sparkles className="h-4 w-4 text-primary" /> AI Assistant (GPT-5.5)
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -510,7 +510,7 @@ export function AdminAiTutorSettings() {
                 openaiApiKey: apiKey || undefined,
               })
               setApiKey('')
-              toast.success('AI Tutor settings saved')
+              toast.success('AI Assistant settings saved')
             } catch (err) {
               toast.error(err instanceof Error ? err.message : 'Save failed')
             } finally {
@@ -520,13 +520,16 @@ export function AdminAiTutorSettings() {
         >
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-            Enable AI Tutor for students
+            Enable AI Assistant for students
           </label>
           <div className="space-y-2">
             <Label>Model</Label>
             <Select value={model} onChange={(e) => setModel(e.target.value)}>
-              <option value="gpt-4o">gpt-4o (recommended · vision)</option>
-              <option value="gpt-4o-mini">gpt-4o-mini (faster · cheaper)</option>
+              <option value="gpt-5.5">gpt-5.5 (latest · recommended)</option>
+              <option value="gpt-5">gpt-5</option>
+              <option value="gpt-4.1">gpt-4.1</option>
+              <option value="gpt-4o">gpt-4o (vision fallback)</option>
+              <option value="gpt-4o-mini">gpt-4o-mini (faster)</option>
             </Select>
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -540,8 +543,9 @@ export function AdminAiTutorSettings() {
             />
           </div>
           <p className="text-xs text-muted-foreground sm:col-span-2">
-            Deploy the <code>ai-tutor</code> Edge Function so students never see this key. Until then, set{' '}
-            <code>VITE_OPENAI_API_KEY</code> for single-tenant GPT-4o. Without a key, learners still get CAPS study help.
+            Deploy the <code>ai-tutor</code> Edge Function so students never see this key. Streaming uses GPT-5.5
+            (or your selected model) via the live backend. Until deployed, set <code>VITE_OPENAI_API_KEY</code> for
+            single-tenant GPT. Without a key, learners still get CAPS study help offline.
           </p>
           <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save AI settings'}</Button>
         </form>
@@ -576,7 +580,7 @@ export function AdminWhatsAppPage() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="WhatsApp & AI"
-        description="Parent WhatsApp alerts and school AI Tutor configuration"
+        description="Parent WhatsApp alerts and school AI Assistant configuration"
       />
       <AdminAiTutorSettings />
       <Card>

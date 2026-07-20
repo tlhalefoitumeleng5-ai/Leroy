@@ -41,9 +41,13 @@ import { todayISO } from '@/lib/utils'
 import {
   buildCapsSystemPrompt,
   generateTutorReply,
+  parseOpenAiSseStream,
+  preferredTutorModel,
+  streamTutorReply,
   type TutorChatMessage,
   type TutorMode,
 } from '@/lib/caps-tutor'
+import { supabaseAnonKey, supabaseUrl } from '@/lib/supabase'
 
 type Listener = () => void
 
@@ -258,7 +262,7 @@ class LiveApi {
           whatsappNotifyAnnouncements: schoolRow.whatsapp_notify_announcements ?? true,
           whatsappNotifyFees: schoolRow.whatsapp_notify_fees ?? true,
           aiTutorEnabled: schoolRow.ai_tutor_enabled ?? true,
-          aiTutorModel: schoolRow.ai_tutor_model ?? 'gpt-4o',
+          aiTutorModel: schoolRow.ai_tutor_model ?? 'gpt-5.5',
           // Never expose openai_api_key to the client cache
         }
       : this.school
@@ -1576,6 +1580,7 @@ class LiveApi {
         imageDataUrl: input.imageDataUrl,
         pdfText: docText,
         learnerName: input.learnerName,
+        model: this.school.aiTutorModel || preferredTutorModel(),
       })
       reply = result.reply
       provider = result.provider
@@ -1599,6 +1604,177 @@ class LiveApi {
       .eq('id', sessionId)
     await this.refresh()
     return { sessionId: sessionId!, reply, provider }
+  }
+
+  /** Streaming AI Assistant — prefers Edge Function (school key), then client GPT stream. */
+  async askAiTutorStream(
+    input: {
+      studentId: string
+      subjectId?: string
+      question: string
+      sessionId?: string
+      gradeLevel?: string
+      languageCode?: string
+      mode?: TutorMode
+      imageDataUrl?: string
+      pdfText?: string
+      documentText?: string
+      learnerName?: string
+      attachmentLabel?: string
+    },
+    onDelta: (fullText: string) => void,
+  ) {
+    const sb = requireSupabase()
+    let sessionId = input.sessionId
+    const subject = input.subjectId ? this.getSubject(input.subjectId) : undefined
+    const docText = input.documentText || input.pdfText
+    const titleBits = [
+      subject?.name || 'AI Assistant',
+      input.mode && input.mode !== 'chat' ? input.mode : null,
+    ].filter(Boolean)
+
+    if (!sessionId) {
+      const { data, error } = await sb
+        .from('ai_tutor_sessions')
+        .insert({
+          school_id: this.school.id,
+          student_id: input.studentId,
+          subject_id: input.subjectId || null,
+          title: titleBits.join(' · '),
+          grade_level: input.gradeLevel || null,
+          language_code: input.languageCode || 'en-ZA',
+          mode: input.mode || 'chat',
+        })
+        .select('*')
+        .single()
+      if (error) throw error
+      sessionId = data.id
+    }
+
+    const userContent = [
+      input.question,
+      input.attachmentLabel ? `\n[Attachment: ${input.attachmentLabel}]` : '',
+    ]
+      .join('')
+      .trim()
+
+    await sb.from('ai_tutor_messages').insert({
+      session_id: sessionId,
+      role: 'user',
+      content: userContent,
+      attachment_type: input.imageDataUrl ? 'image' : docText ? 'document' : null,
+    })
+    if (!sessionId) throw new Error('Could not create assistant session')
+
+    const prior = this.listAiMessages(sessionId).map(
+      (m): TutorChatMessage => ({
+        role: m.role === 'system' ? 'system' : m.role,
+        content: m.content,
+      }),
+    )
+
+    const systemPrompt = buildCapsSystemPrompt({
+      subjectName: subject?.name,
+      gradeLevel: input.gradeLevel,
+      languageCode: input.languageCode,
+      mode: input.mode,
+      learnerName: input.learnerName,
+    })
+
+    const historyPayload = prior.slice(-20).map((h) => ({ role: h.role, content: h.content }))
+    const docBlock = docText ? `\n\nUploaded document text:\n${docText.slice(0, 18000)}` : ''
+    const userMsg =
+      input.imageDataUrl
+        ? {
+            role: 'user' as const,
+            content: [
+              { type: 'text', text: userContent + docBlock },
+              { type: 'image_url', image_url: { url: input.imageDataUrl, detail: 'high' } },
+            ],
+          }
+        : { role: 'user' as const, content: userContent + docBlock }
+
+    let reply = ''
+    let provider: 'openai' | 'fallback' = 'fallback'
+    let model: string | undefined
+
+    // 1) Live backend: stream via Edge Function (uses school OpenAI key)
+    try {
+      const { data: auth } = await sb.auth.getSession()
+      const token = auth.session?.access_token
+      if (token && supabaseUrl) {
+        const res = await fetch(`${supabaseUrl}/functions/v1/ai-tutor`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            apikey: supabaseAnonKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            systemPrompt,
+            messages: [...historyPayload, userMsg],
+            stream: true,
+          }),
+        })
+        const ct = res.headers.get('content-type') || ''
+        if (res.ok && res.body && ct.includes('text/event-stream')) {
+          model = res.headers.get('X-AI-Model') || preferredTutorModel(this.school.aiTutorModel)
+          reply = await parseOpenAiSseStream(res.body, (_chunk, full) => onDelta(full))
+          if (reply) provider = 'openai'
+        } else if (res.ok) {
+          const json = (await res.json()) as { reply?: string; model?: string; code?: string }
+          if (json.reply) {
+            reply = String(json.reply)
+            provider = 'openai'
+            model = json.model || preferredTutorModel(this.school.aiTutorModel)
+            onDelta(reply)
+          }
+        }
+      }
+    } catch {
+      // edge not deployed / network — continue
+    }
+
+    // 2) Client streaming (VITE_OPENAI_API_KEY) or offline CAPS fallback
+    if (!reply) {
+      const result = await streamTutorReply(
+        {
+          question: input.question,
+          subjectName: subject?.name,
+          gradeLevel: input.gradeLevel,
+          languageCode: input.languageCode,
+          mode: input.mode,
+          history: prior,
+          imageDataUrl: input.imageDataUrl,
+          pdfText: docText,
+          learnerName: input.learnerName,
+          model: this.school.aiTutorModel || preferredTutorModel(),
+        },
+        (_chunk, full) => onDelta(full),
+      )
+      reply = result.reply
+      provider = result.provider
+      model = result.model
+    }
+
+    await sb.from('ai_tutor_messages').insert({
+      session_id: sessionId,
+      role: 'assistant',
+      content: reply,
+      provider,
+    })
+    await sb
+      .from('ai_tutor_sessions')
+      .update({
+        updated_at: new Date().toISOString(),
+        language_code: input.languageCode || 'en-ZA',
+        mode: input.mode || 'chat',
+        grade_level: input.gradeLevel || null,
+        subject_id: input.subjectId || null,
+      })
+      .eq('id', sessionId)
+    await this.refresh()
+    return { sessionId: sessionId!, reply, provider, model }
   }
 
   async updateAiTutorSettings(patch: {

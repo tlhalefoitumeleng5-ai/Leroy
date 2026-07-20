@@ -52,7 +52,7 @@ function navForRole(role: UserRole): NavItem[] {
         { to: '/student/subjects', label: 'Subjects', icon: icon(<GraduationCap className="h-4 w-4" />) },
         { to: '/student/marks', label: 'Marks', icon: icon(<FileText className="h-4 w-4" />) },
         { to: '/student/exams', label: 'Exam Results', icon: icon(<FileText className="h-4 w-4" />) },
-        { to: '/student/ai-tutor', label: 'AI Tutor', icon: icon(<Bot className="h-4 w-4" />) },
+        { to: '/student/ai-tutor', label: 'AI Assistant', icon: icon(<Bot className="h-4 w-4" />) },
         { to: '/student/messages', label: 'Messages', icon: icon(<MessageSquare className="h-4 w-4" />) },
         { to: '/student/fees', label: 'Fees', icon: icon(<CreditCard className="h-4 w-4" />) },
         { to: '/student/announcements', label: 'Announcements', icon: icon(<Megaphone className="h-4 w-4" />) },

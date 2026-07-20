@@ -152,7 +152,7 @@ export function StudentDashboard() {
 
       <QuickLinks
         items={[
-          { to: '/student/ai-tutor', label: 'AI Tutor', hint: 'CAPS study help' },
+          { to: '/student/ai-tutor', label: 'AI Assistant', hint: 'GPT-5.5 CAPS help' },
           { to: '/student/homework', label: 'Homework', hint: 'Upload submissions' },
           { to: '/student/messages', label: 'Messages', hint: 'Chat with teachers' },
           { to: '/student/fees', label: 'Fees', hint: 'View invoices' },
