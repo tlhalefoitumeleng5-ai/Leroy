@@ -34,7 +34,7 @@ CREATE POLICY profiles_select_own_or_school ON profiles
   FOR SELECT USING (
     id = auth.uid()
     OR is_admin()
-    OR (school_id = current_school_id() AND current_role() IN ('teacher', 'school_admin', 'super_admin'))
+    OR (school_id = current_school_id() AND app_user_role() IN ('teacher', 'school_admin', 'super_admin'))
   );
 
 CREATE POLICY profiles_update_own ON profiles
@@ -45,10 +45,10 @@ CREATE POLICY profiles_admin_insert ON profiles
 
 -- ---------- schools ----------
 CREATE POLICY schools_select ON schools
-  FOR SELECT USING (id = current_school_id() OR is_admin() OR current_role() = 'super_admin');
+  FOR SELECT USING (id = current_school_id() OR is_admin() OR app_user_role() = 'super_admin');
 
 CREATE POLICY schools_admin_all ON schools
-  FOR ALL USING (is_admin() OR current_role() = 'super_admin');
+  FOR ALL USING (is_admin() OR app_user_role() = 'super_admin');
 
 -- ---------- academic structure (read school, write admin) ----------
 CREATE POLICY grades_select ON grades FOR SELECT USING (school_id = current_school_id() OR is_admin());
@@ -100,7 +100,7 @@ CREATE POLICY marks_select ON marks FOR SELECT USING (
   OR student_id = own_student_id()
   OR parent_linked_to_student(student_id)
   OR (
-    current_role() = 'teacher'
+    app_user_role() = 'teacher'
     AND EXISTS (
       SELECT 1
       FROM assessments a
@@ -114,7 +114,7 @@ CREATE POLICY marks_select ON marks FOR SELECT USING (
 CREATE POLICY marks_insert_teacher ON marks FOR INSERT WITH CHECK (
   is_admin()
   OR (
-    current_role() = 'teacher'
+    app_user_role() = 'teacher'
     AND EXISTS (
       SELECT 1
       FROM assessments a
@@ -128,7 +128,7 @@ CREATE POLICY marks_insert_teacher ON marks FOR INSERT WITH CHECK (
 CREATE POLICY marks_update_teacher ON marks FOR UPDATE USING (
   is_admin()
   OR (
-    current_role() = 'teacher'
+    app_user_role() = 'teacher'
     AND EXISTS (
       SELECT 1
       FROM assessments a
@@ -148,7 +148,7 @@ CREATE POLICY assessments_select ON assessments FOR SELECT USING (
 CREATE POLICY assessments_write ON assessments FOR ALL USING (
   is_admin()
   OR (
-    current_role() = 'teacher'
+    app_user_role() = 'teacher'
     AND EXISTS (
       SELECT 1 FROM class_subjects cs
       WHERE cs.id = class_subject_id AND cs.teacher_id = auth.uid()
@@ -162,7 +162,7 @@ CREATE POLICY attendance_select ON attendance FOR SELECT USING (
   OR student_id = own_student_id()
   OR parent_linked_to_student(student_id)
   OR (
-    current_role() = 'teacher'
+    app_user_role() = 'teacher'
     AND EXISTS (
       SELECT 1 FROM class_subjects cs
       WHERE cs.class_id = attendance.class_id AND cs.teacher_id = auth.uid()
@@ -173,7 +173,7 @@ CREATE POLICY attendance_select ON attendance FOR SELECT USING (
 CREATE POLICY attendance_write ON attendance FOR ALL USING (
   is_admin()
   OR (
-    current_role() = 'teacher'
+    app_user_role() = 'teacher'
     AND EXISTS (
       SELECT 1 FROM class_subjects cs
       WHERE cs.class_id = class_id AND cs.teacher_id = auth.uid()
@@ -222,12 +222,12 @@ CREATE POLICY push_own ON push_subscriptions FOR ALL USING (user_id = auth.uid()
 
 -- ---------- forum (parents + admins) ----------
 CREATE POLICY forum_posts_select ON forum_posts FOR SELECT USING (
-  (school_id = current_school_id() AND is_hidden = false AND current_role() IN ('parent', 'school_admin', 'super_admin'))
+  (school_id = current_school_id() AND is_hidden = false AND app_user_role() IN ('parent', 'school_admin', 'super_admin'))
   OR is_admin()
 );
 
 CREATE POLICY forum_posts_insert ON forum_posts FOR INSERT WITH CHECK (
-  current_role() = 'parent' AND author_id = auth.uid() AND school_id = current_school_id()
+  app_user_role() = 'parent' AND author_id = auth.uid() AND school_id = current_school_id()
 );
 
 CREATE POLICY forum_posts_update ON forum_posts FOR UPDATE USING (
@@ -242,7 +242,7 @@ CREATE POLICY forum_comments_select ON forum_comments FOR SELECT USING (
 );
 
 CREATE POLICY forum_comments_insert ON forum_comments FOR INSERT WITH CHECK (
-  current_role() IN ('parent', 'school_admin', 'super_admin') AND author_id = auth.uid()
+  app_user_role() IN ('parent', 'school_admin', 'super_admin') AND author_id = auth.uid()
 );
 
 CREATE POLICY forum_likes_all ON forum_likes FOR ALL USING (
@@ -250,13 +250,13 @@ CREATE POLICY forum_likes_all ON forum_likes FOR ALL USING (
 );
 
 CREATE POLICY forum_reports_insert ON forum_reports FOR INSERT WITH CHECK (
-  reported_by = auth.uid() AND current_role() IN ('parent', 'school_admin', 'super_admin')
+  reported_by = auth.uid() AND app_user_role() IN ('parent', 'school_admin', 'super_admin')
 );
 
 CREATE POLICY forum_reports_admin ON forum_reports FOR SELECT USING (is_admin());
 
 -- ---------- audit ----------
-CREATE POLICY audit_admin ON audit_logs FOR SELECT USING (is_admin() OR current_role() = 'super_admin');
+CREATE POLICY audit_admin ON audit_logs FOR SELECT USING (is_admin() OR app_user_role() = 'super_admin');
 CREATE POLICY audit_insert ON audit_logs FOR INSERT WITH CHECK (actor_id = auth.uid() OR is_admin());
 
 -- Storage buckets (run in Supabase dashboard / storage API)

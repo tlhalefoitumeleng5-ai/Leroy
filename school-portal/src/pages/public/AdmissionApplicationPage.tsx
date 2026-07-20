@@ -43,7 +43,7 @@ export function AdmissionApplicationPage() {
     setFiles((f) => ({ ...f, [key]: `uploads/${file.name}` }))
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!validateSaId(form.idNumber) && form.idNumber.replace(/\s/g, '').length === 13) {
       // soft warning — still allow if Luhn fails for demo flexibility with sample IDs
@@ -53,24 +53,28 @@ export function AdmissionApplicationPage() {
       toast.error('Please upload all required documents')
       return
     }
-    const adm = api.createAdmission({
-      applicantName: form.applicantName,
-      applicantSurname: form.applicantSurname,
-      idNumber: form.idNumber.replace(/\s/g, ''),
-      gender: form.gender,
-      dateOfBirth: form.dateOfBirth,
-      gradeApplyingFor: Number(form.gradeApplyingFor),
-      currentSchool: form.currentSchool || undefined,
-      previousGrade: form.previousGrade ? Number(form.previousGrade) : undefined,
-      parentName: form.parentName,
-      parentPhone: form.parentPhone,
-      parentEmail: form.parentEmail,
-      physicalAddress: form.physicalAddress,
-      emergencyContact: form.emergencyContact || undefined,
-      ...files,
-    })
-    setSubmittedId(adm.id)
-    toast.success('Application submitted')
+    try {
+      const adm = await api.createAdmission({
+        applicantName: form.applicantName,
+        applicantSurname: form.applicantSurname,
+        idNumber: form.idNumber.replace(/\s/g, ''),
+        gender: form.gender,
+        dateOfBirth: form.dateOfBirth,
+        gradeApplyingFor: Number(form.gradeApplyingFor),
+        currentSchool: form.currentSchool || undefined,
+        previousGrade: form.previousGrade ? Number(form.previousGrade) : undefined,
+        parentName: form.parentName,
+        parentPhone: form.parentPhone,
+        parentEmail: form.parentEmail,
+        physicalAddress: form.physicalAddress,
+        emergencyContact: form.emergencyContact || undefined,
+        ...files,
+      })
+      setSubmittedId(adm.id)
+      toast.success('Application submitted')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Submission failed')
+    }
   }
 
   if (submittedId) {

@@ -69,12 +69,15 @@ async function runViaPostgres(sql) {
   if (!dbPassword) throw new Error('SUPABASE_DB_PASSWORD required for direct Postgres')
   const host =
     process.env.SUPABASE_DB_HOST ||
-    `db.${projectRef}.supabase.co`
+    `aws-1-eu-west-2.pooler.supabase.com`
+  // Session mode (5432) required for DDL / migrations
+  const port = Number(process.env.SUPABASE_DB_PORT || 5432)
+  const user = process.env.SUPABASE_DB_USER || `postgres.${projectRef}`
   const client = new pg.Client({
     host,
-    port: Number(process.env.SUPABASE_DB_PORT || 5432),
+    port,
     database: 'postgres',
-    user: 'postgres',
+    user,
     password: dbPassword,
     ssl: { rejectUnauthorized: false },
   })

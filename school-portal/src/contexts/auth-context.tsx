@@ -9,6 +9,7 @@ import {
 } from 'react'
 import type { AuthUser, Profile, UserRole } from '@/types'
 import { hasSupabaseConfig, requireSupabase } from '@/lib/supabase'
+import { api } from '@/services/api'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -76,6 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
       return
     }
+    try {
+      await api.refresh()
+    } catch (e) {
+      console.error('Failed to load school data', e)
+    }
     setUser({ id: sessionUser.id, email: sessionUser.email ?? profile.email, profile })
     setLoading(false)
   }, [])
@@ -101,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const profile = await fetchProfile(data.user.id)
     if (!profile) throw new Error('Profile missing. Run npm run db:seed')
     if (!profile.isActive) throw new Error('This account has been deactivated.')
+    await api.refresh()
     await sb.from('audit_logs').insert({
       school_id: profile.schoolId || null,
       actor_id: profile.id,

@@ -119,8 +119,7 @@ export function AccountPage() {
               variant="outline"
               size="sm"
               onClick={() => {
-                api.markAllRead(user.id)
-                toast.success('All marked as read')
+                void api.markAllRead(user.id).then(() => toast.success('All marked as read'))
               }}
             >
               Mark all read
@@ -135,7 +134,9 @@ export function AccountPage() {
               <button
                 key={n.id}
                 className={`w-full rounded-lg border border-border p-3 text-left transition hover:bg-muted/50 ${n.isRead ? 'opacity-70' : 'bg-primary/5'}`}
-                onClick={() => api.markNotificationRead(n.id)}
+                onClick={() => {
+                  void api.markNotificationRead(n.id)
+                }}
               >
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-medium">{n.title}</p>

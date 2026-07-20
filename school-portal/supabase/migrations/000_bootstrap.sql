@@ -365,7 +365,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE OR REPLACE FUNCTION public.current_role()
+CREATE OR REPLACE FUNCTION public.app_user_role()
 RETURNS user_role LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT role FROM profiles WHERE id = auth.uid();
 $$;
