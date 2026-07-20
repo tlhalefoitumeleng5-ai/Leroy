@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --color-background: #f4f7fb;
+  --color-foreground: #0f172a;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+  --color-primary: #1e40af;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #e8eef9;
+  --color-secondary-foreground: #1e3a8a;
+  --color-muted: #eef2f7;
+  --color-muted-foreground: #64748b;
+  --color-accent: #dbeafe;
+  --color-accent-foreground: #1e40af;
+  --color-destructive: #dc2626;
+  --color-border: #d8e0ec;
+  --color-input: #d8e0ec;
+  --color-ring: #3b82f6;
+  --radius-lg: 0.75rem;
+}
+
+.dark {
+  --color-background: #0b1220;
+  --color-foreground: #e8eef9;
+  --color-card: #121a2b;
+  --color-card-foreground: #e8eef9;
+  --color-primary: #3b82f6;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #1a2438;
+  --color-secondary-foreground: #bfdbfe;
+  --color-muted: #1a2438;
+  --color-muted-foreground: #94a3b8;
+  --color-accent: #1e3a5f;
+  --color-accent-foreground: #bfdbfe;
+  --color-destructive: #f87171;
+  --color-border: #243049;
+  --color-input: #243049;
+  --color-ring: #60a5fa;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply scroll-smooth;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 0% -20%, color-mix(in oklab, var(--color-primary) 18%, transparent), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, color-mix(in oklab, #60a5fa 12%, transparent), transparent);
+    min-height: 100dvh;
+  }
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@utility animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+@utility animate-slide-up {
+  animation: slide-up 0.45s ease-out both;
+}
+@utility animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
