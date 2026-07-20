@@ -470,8 +470,7 @@ export function TeacherMaterialsPage() {
 
 export function TeacherReportsPage() {
   const { user } = useAuth()
-  if (!user) return null
-  const marks = api.getMarksForUser(user.profile)
+  const marks = user ? api.getMarksForUser(user.profile) : []
   const bySubject = useMemo(() => {
     const map = new Map<string, number[]>()
     marks.forEach((m) => {
@@ -485,6 +484,8 @@ export function TeacherReportsPage() {
       count: vals.length,
     }))
   }, [marks])
+
+  if (!user) return null
 
   return (
     <div>

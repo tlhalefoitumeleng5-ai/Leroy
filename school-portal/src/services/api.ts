@@ -14,6 +14,7 @@ import type {
   ForumReport,
   Grade,
   Homework,
+  HomeworkSubmission,
   LearningMaterial,
   Mark,
   Parent,
@@ -28,7 +29,7 @@ import type {
   UserRole,
 } from '@/types'
 import { requireSupabase } from '@/lib/supabase'
-import { todayISO, uid } from '@/lib/utils'
+import { todayISO } from '@/lib/utils'
 
 type Listener = () => void
 
@@ -78,6 +79,7 @@ class LiveApi {
   forumComments: ForumComment[] = []
   forumReports: ForumReport[] = []
   auditLogs: AuditLog[] = []
+  homeworkSubmissions: HomeworkSubmission[] = []
 
   subscribe(fn: Listener) {
     this.listeners.add(fn)
@@ -148,6 +150,7 @@ class LiveApi {
       forumLikes,
       forumReports,
       auditLogs,
+      homeworkSubmissions,
     ] = await Promise.all([
       sb.from('schools').select('*'),
       sb.from('profiles').select('*'),
@@ -174,12 +177,14 @@ class LiveApi {
       sb.from('forum_likes').select('*'),
       sb.from('forum_reports').select('*'),
       sb.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200),
+      sb.from('homework_submissions').select('*'),
     ])
 
     const err = [
       schools, profiles, grades, classes, subjects, classSubjects, teachers, students, parents,
       parentStudents, admissions, attendance, assessments, marks, homework, materials, timetable,
       calendar, announcements, notifications, forumPosts, forumComments, forumLikes, forumReports, auditLogs,
+      homeworkSubmissions,
     ].find((r) => r.error)
     if (err?.error) throw err.error
 
@@ -192,6 +197,7 @@ class LiveApi {
           address: schoolRow.address ?? undefined,
           phone: schoolRow.phone ?? undefined,
           email: schoolRow.email ?? undefined,
+          logoUrl: schoolRow.logo_url ?? undefined,
         }
       : this.school
 
@@ -240,6 +246,8 @@ class LiveApi {
       admissionDate: s.admission_date ?? undefined,
       emergencyContactName: s.emergency_contact_name ?? undefined,
       emergencyContactPhone: s.emergency_contact_phone ?? undefined,
+      house: s.house ?? undefined,
+      admissionNumber: s.admission_number ?? s.student_number ?? undefined,
     }))
     this.parents = (parents.data ?? []).map((p) => ({
       id: p.id,
@@ -421,6 +429,16 @@ class LiveApi {
       entityId: l.entity_id ?? undefined,
       metadata: (l.metadata as Record<string, unknown>) ?? undefined,
       createdAt: l.created_at,
+    }))
+    this.homeworkSubmissions = (homeworkSubmissions.data ?? []).map((s) => ({
+      id: s.id,
+      homeworkId: s.homework_id,
+      studentId: s.student_id,
+      fileUrl: s.file_url ?? undefined,
+      fileName: s.file_name ?? undefined,
+      notes: s.notes ?? undefined,
+      status: s.status,
+      submittedAt: s.submitted_at,
     }))
 
     this.ready = true
@@ -1000,6 +1018,110 @@ class LiveApi {
     const sb = requireSupabase()
     await sb.from('notifications').update({ is_read: true }).eq('user_id', userId)
     await this.refresh()
+  }
+
+  async deleteNotification(id: string) {
+    const sb = requireSupabase()
+    const { error } = await sb.from('notifications').delete().eq('id', id)
+    if (error) throw error
+    await this.refresh()
+  }
+
+  getHomeworkSubmission(homeworkId: string, studentId: string) {
+    return this.homeworkSubmissions.find((s) => s.homeworkId === homeworkId && s.studentId === studentId)
+  }
+
+  async submitHomework(input: {
+    homeworkId: string
+    studentId: string
+    file?: File
+    notes?: string
+    userId: string
+  }) {
+    const sb = requireSupabase()
+    const homework = this.homework.find((h) => h.id === input.homeworkId)
+    let fileUrl: string | undefined
+    let fileName: string | undefined
+    if (input.file) {
+      fileName = input.file.name
+      const path = `${input.userId}/${input.homeworkId}/${Date.now()}-${input.file.name}`
+      const { error: upErr } = await sb.storage.from('homework-submissions').upload(path, input.file, {
+        upsert: true,
+      })
+      if (upErr) throw upErr
+      const { data } = sb.storage.from('homework-submissions').getPublicUrl(path)
+      fileUrl = data.publicUrl || path
+    }
+    const late = homework ? homework.dueDate < todayISO() : false
+    const { error } = await sb.from('homework_submissions').upsert(
+      {
+        homework_id: input.homeworkId,
+        student_id: input.studentId,
+        file_url: fileUrl,
+        file_name: fileName,
+        notes: input.notes,
+        status: late ? 'late' : 'submitted',
+        submitted_at: new Date().toISOString(),
+      },
+      { onConflict: 'homework_id,student_id' },
+    )
+    if (error) throw error
+    await this.refresh()
+  }
+
+  async uploadAvatar(userId: string, file: File) {
+    const sb = requireSupabase()
+    const path = `${userId}/avatar-${Date.now()}.${file.name.split('.').pop() || 'jpg'}`
+    const { error: upErr } = await sb.storage.from('avatars').upload(path, file, { upsert: true })
+    if (upErr) throw upErr
+    const { data } = sb.storage.from('avatars').getPublicUrl(path)
+    const avatarUrl = data.publicUrl
+    const { error } = await sb.from('profiles').update({ avatar_url: avatarUrl }).eq('id', userId)
+    if (error) throw error
+    await this.refresh()
+    return avatarUrl
+  }
+
+  getParentsForStudent(studentId: string) {
+    const links = this.parentStudents.filter((ps) => ps.studentId === studentId)
+    return links
+      .map((ps) => {
+        const parent = this.parents.find((p) => p.id === ps.parentId)
+        const profile = parent ? this.getProfile(parent.profileId) : undefined
+        return profile ? { ...profile, relationship: parent?.relationship, isPrimary: ps.isPrimary } : null
+      })
+      .filter(Boolean) as Array<Profile & { relationship?: string; isPrimary: boolean }>
+  }
+
+  async updateStudentSelf(
+    studentId: string,
+    patch: { emergencyContactName?: string; emergencyContactPhone?: string },
+  ) {
+    const sb = requireSupabase()
+    const payload: Record<string, string | undefined> = {}
+    if (patch.emergencyContactName !== undefined) payload.emergency_contact_name = patch.emergencyContactName
+    if (patch.emergencyContactPhone !== undefined) payload.emergency_contact_phone = patch.emergencyContactPhone
+    const { error } = await sb.from('students').update(payload).eq('id', studentId)
+    if (error) throw error
+    await this.refresh()
+  }
+
+  /** Live notification channel for the signed-in user (Student Portal v1.1). */
+  subscribeNotifications(userId: string, onChange?: () => void) {
+    const sb = requireSupabase()
+    const channel = sb
+      .channel(`notifications:${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        () => {
+          void this.refresh().then(() => onChange?.())
+        },
+      )
+      .subscribe()
+    return () => {
+      void sb.removeChannel(channel)
+    }
   }
 
   async addAudit(

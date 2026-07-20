@@ -42,6 +42,7 @@ export interface School {
   address?: string
   phone?: string
   email?: string
+  logoUrl?: string
 }
 
 export interface Grade {
@@ -85,6 +86,19 @@ export interface Student {
   admissionDate?: string
   emergencyContactName?: string
   emergencyContactPhone?: string
+  house?: string
+  admissionNumber?: string
+}
+
+export interface HomeworkSubmission {
+  id: string
+  homeworkId: string
+  studentId: string
+  fileUrl?: string
+  fileName?: string
+  notes?: string
+  status: 'pending' | 'submitted' | 'late' | 'graded'
+  submittedAt: string
 }
 
 export interface Teacher {

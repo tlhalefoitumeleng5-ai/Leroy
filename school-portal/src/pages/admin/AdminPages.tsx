@@ -16,7 +16,7 @@ import {
   Th,
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input, Label, Select, Textarea } from '@/components/ui/input'
+import { Input, Select, Textarea } from '@/components/ui/input'
 import { formatDate, formatDateTime, fullName } from '@/lib/utils'
 import type { ApplicationStatus } from '@/types'
 import { TimetableView } from '@/pages/student/StudentPages'

@@ -224,7 +224,7 @@ export function AppShell() {
             ) : null}
           </Button>
         </header>
-        <main className="flex-1 p-4 md:p-6 lg:p-8">
+        <main className="flex-1 px-4 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>
