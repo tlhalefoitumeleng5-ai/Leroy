@@ -36,6 +36,7 @@ import {
   TeacherAttendancePage,
   TeacherClassesPage,
   TeacherDashboard,
+  TeacherHomeworkPage,
   TeacherMarksPage,
   TeacherMaterialsPage,
   TeacherProgressPage,
@@ -60,6 +61,14 @@ import {
   SuperSchoolsPage,
   SuperUsersPage,
 } from '@/pages/admin/AdminPages'
+import {
+  AdminFeesPage,
+  AdminWhatsAppPage,
+  MessagingPage,
+  ParentFeesPage,
+  StudentAiTutorPage,
+  StudentFeesPage,
+} from '@/pages/shared/ProductionPages'
 
 function HomeRedirect() {
   const { user, loading } = useAuth()
@@ -102,6 +111,9 @@ export default function App() {
             <Route path="/student/announcements" element={<StudentAnnouncementsPage />} />
             <Route path="/student/notifications" element={<StudentNotificationsPage />} />
             <Route path="/student/report-card" element={<StudentReportCardPage />} />
+            <Route path="/student/messages" element={<MessagingPage />} />
+            <Route path="/student/fees" element={<StudentFeesPage />} />
+            <Route path="/student/ai-tutor" element={<StudentAiTutorPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={['parent']} />}>
@@ -114,6 +126,8 @@ export default function App() {
             <Route path="/parent/calendar" element={<ParentCalendarPage />} />
             <Route path="/parent/notifications" element={<ParentNotificationsPage />} />
             <Route path="/parent/forum" element={<ParentForumPage />} />
+            <Route path="/parent/fees" element={<ParentFeesPage />} />
+            <Route path="/parent/messages" element={<MessagingPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={['teacher']} />}>
@@ -123,9 +137,11 @@ export default function App() {
             <Route path="/teacher/classes" element={<TeacherClassesPage />} />
             <Route path="/teacher/subjects" element={<TeacherSubjectsPage />} />
             <Route path="/teacher/materials" element={<TeacherMaterialsPage />} />
+            <Route path="/teacher/homework" element={<TeacherHomeworkPage />} />
             <Route path="/teacher/reports" element={<TeacherReportsPage />} />
             <Route path="/teacher/progress" element={<TeacherProgressPage />} />
             <Route path="/teacher/timetable" element={<TeacherTimetablePage />} />
+            <Route path="/teacher/messages" element={<MessagingPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={['school_admin', 'super_admin']} />}>
@@ -141,6 +157,9 @@ export default function App() {
             <Route path="/admin/calendar" element={<AdminCalendarPage />} />
             <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
             <Route path="/admin/audit" element={<AdminAuditPage />} />
+            <Route path="/admin/fees" element={<AdminFeesPage />} />
+            <Route path="/admin/whatsapp" element={<AdminWhatsAppPage />} />
+            <Route path="/admin/messages" element={<MessagingPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={['super_admin']} />}>

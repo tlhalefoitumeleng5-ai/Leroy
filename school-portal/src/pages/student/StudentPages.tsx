@@ -55,6 +55,7 @@ import {
   useApiRefresh,
 } from '@/lib/student-helpers'
 import { schoolName } from '@/lib/supabase'
+import { CapsSubjectsBanner, QuickLinks } from '@/pages/shared/ProductionPages'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
 
@@ -124,7 +125,7 @@ export function StudentDashboard() {
               size="lg"
             />
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Student Portal · v1.1</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Student Portal · Production</p>
               <h1 className="font-display text-2xl font-bold md:text-3xl">
                 Sawubona, {user.profile.firstName}
               </h1>
@@ -148,6 +149,18 @@ export function StudentDashboard() {
         <StatCard title="Upcoming today" value={upcoming.length} hint="Lessons on your timetable" icon={<Clock className="h-5 w-5" />} />
         <StatCard title="Unread alerts" value={notifications.filter((n) => !n.isRead).length} icon={<Bell className="h-5 w-5" />} />
       </div>
+
+      <QuickLinks
+        items={[
+          { to: '/student/ai-tutor', label: 'AI Tutor', hint: 'CAPS study help' },
+          { to: '/student/homework', label: 'Homework', hint: 'Upload submissions' },
+          { to: '/student/messages', label: 'Messages', hint: 'Chat with teachers' },
+          { to: '/student/fees', label: 'Fees', hint: 'View invoices' },
+          { to: '/student/report-card', label: 'Report card', hint: 'PDF download' },
+          { to: '/student/marks', label: 'Marks', hint: 'SBA · tests · exams' },
+        ]}
+      />
+      <CapsSubjectsBanner />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="animate-slide-up">

@@ -43,6 +43,14 @@ export interface School {
   phone?: string
   email?: string
   logoUrl?: string
+  whatsappEnabled?: boolean
+  whatsappProvider?: string
+  whatsappFrom?: string
+  whatsappAccountSid?: string
+  whatsappAuthToken?: string
+  whatsappNotifyAttendance?: boolean
+  whatsappNotifyAnnouncements?: boolean
+  whatsappNotifyFees?: boolean
 }
 
 export interface Grade {
@@ -67,6 +75,100 @@ export interface Subject {
   code: string
   name: string
   description?: string
+  capsCode?: string
+  phase?: 'foundation' | 'intermediate' | 'senior' | 'fet'
+  capsWeightingSba?: number
+  capsWeightingExam?: number
+}
+
+export interface FeeStructure {
+  id: string
+  schoolId: string
+  name: string
+  description?: string
+  amountCents: number
+  gradeId?: string
+  academicYear: string
+  dueDate?: string
+  isActive: boolean
+  createdAt: string
+}
+
+export interface FeeInvoice {
+  id: string
+  schoolId: string
+  studentId: string
+  feeStructureId?: string
+  invoiceNumber: string
+  description: string
+  amountCents: number
+  amountPaidCents: number
+  status: 'unpaid' | 'partial' | 'paid' | 'overdue' | 'waived'
+  dueDate?: string
+  issuedAt: string
+}
+
+export interface FeePayment {
+  id: string
+  schoolId: string
+  invoiceId: string
+  amountCents: number
+  method: 'eft' | 'cash' | 'card' | 'payfast' | 'ozow' | 'other'
+  reference?: string
+  receivedAt: string
+  recordedBy?: string
+  notes?: string
+}
+
+export interface Conversation {
+  id: string
+  schoolId: string
+  subject?: string
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+  participantIds: string[]
+}
+
+export interface ChatMessage {
+  id: string
+  conversationId: string
+  senderId: string
+  body: string
+  createdAt: string
+  isDeleted: boolean
+}
+
+export interface AiTutorSession {
+  id: string
+  schoolId: string
+  studentId: string
+  subjectId?: string
+  title: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AiTutorMessage {
+  id: string
+  sessionId: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  createdAt: string
+}
+
+export interface WhatsAppOutboxItem {
+  id: string
+  schoolId: string
+  toPhone: string
+  body: string
+  relatedType?: string
+  relatedId?: string
+  status: 'pending' | 'sent' | 'failed' | 'skipped'
+  providerMessageId?: string
+  error?: string
+  createdAt: string
+  sentAt?: string
 }
 
 export interface ClassSubject {

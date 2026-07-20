@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Heart, MessageSquare, Search, Flag } from 'lucide-react'
+import { Heart, MessageSquare, Search, Flag, CreditCard } from 'lucide-react'
 import { useAuth } from '@/contexts/auth-context'
 import { api } from '@/services/api'
 import {
@@ -19,38 +20,69 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { formatDate, formatDateTime, fullName, percentageColor } from '@/lib/utils'
+import { formatZar } from '@/lib/caps-tutor'
+import { attendanceStats, capsLevel, useApiRefresh } from '@/lib/student-helpers'
 import { TimetableView } from '@/pages/student/StudentPages'
+import { QuickLinks } from '@/pages/shared/ProductionPages'
 
 export function ParentDashboard() {
+  useApiRefresh()
   const { user } = useAuth()
   if (!user) return null
   const children = api.getLinkedStudents(user.id)
   const marks = api.getMarksForUser(user.profile)
   const attendance = api.getAttendanceForUser(user.profile)
   const unread = api.getNotifications(user.id).filter((n) => !n.isRead).length
+  const invoices = children.flatMap((c) => api.listFeeInvoices(c.id))
+  const owed = invoices.reduce((s, i) => s + Math.max(0, i.amountCents - i.amountPaidCents), 0)
+  const avg = marks.length ? Math.round(marks.reduce((s, m) => s + m.percentage, 0) / marks.length) : 0
+  const caps = capsLevel(avg)
+  const att = attendanceStats(attendance)
 
   return (
-    <div>
-      <PageHeader title={`Welcome, ${user.profile.firstName}`} description="Stay connected with your child's progress" />
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title={`Welcome, ${user.profile.firstName}`}
+        description="Stay connected with your child's CAPS progress"
+      />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Linked children" value={children.length} />
-        <StatCard title="Recent marks" value={marks.length} />
-        <StatCard title="Attendance records" value={attendance.length} />
-        <StatCard title="Unread alerts" value={unread} />
+        <StatCard title="Academic average" value={marks.length ? `${avg}%` : '—'} hint={caps.label} />
+        <StatCard title="Attendance" value={`${att.percentage}%`} hint={`${att.present} present · ${att.absent} absent`} />
+        <StatCard title="Fees outstanding" value={formatZar(owed)} icon={<CreditCard className="h-5 w-5" />} />
       </div>
+      <QuickLinks
+        items={[
+          { to: '/parent/fees', label: 'School fees', hint: 'Statements & balances' },
+          { to: '/parent/messages', label: 'Messages', hint: 'Chat with teachers' },
+          { to: '/parent/marks', label: 'Marks', hint: 'SBA, tests & exams' },
+          { to: '/parent/attendance', label: 'Attendance', hint: 'Daily records' },
+          { to: '/parent/announcements', label: 'Announcements', hint: 'School notices' },
+          { to: '/parent/notifications', label: 'Notifications', hint: `${unread} unread` },
+        ]}
+      />
       <div className="grid gap-4 lg:grid-cols-2">
         {children.map((c) => {
           const p = api.getProfile(c.profileId)
           const cls = c.classId ? api.getClass(c.classId) : undefined
+          const childMarks = marks.filter((m) => m.studentId === c.id)
+          const childAvg = childMarks.length
+            ? Math.round(childMarks.reduce((s, m) => s + m.percentage, 0) / childMarks.length)
+            : 0
           return (
-            <Card key={c.id}>
+            <Card key={c.id} className="animate-slide-up">
               <CardHeader>
                 <CardTitle>{p ? fullName(p.firstName, p.lastName) : 'Learner'}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm space-y-1">
                 <p>Student no: {c.studentNumber}</p>
                 <p>Class: {cls?.name ?? '—'}</p>
+                <p>House: {c.house ?? '—'}</p>
+                <p>Average: {childMarks.length ? `${childAvg}% (CAPS L${capsLevel(childAvg).level})` : '—'}</p>
                 <p>Emergency: {c.emergencyContactPhone ?? '—'}</p>
+                <Link to="/parent/child" className="inline-block pt-2 text-primary text-xs hover:underline">
+                  View full profile
+                </Link>
               </CardContent>
             </Card>
           )

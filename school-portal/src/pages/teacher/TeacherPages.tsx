@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/auth-context'
 import { api } from '@/services/api'
@@ -18,25 +19,43 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input, Label, Select, Textarea } from '@/components/ui/input'
 import { formatDate, fullName, percentageColor, todayISO } from '@/lib/utils'
+import { useApiRefresh } from '@/lib/student-helpers'
 import type { AttendanceStatus, AssessmentType } from '@/types'
 import { TimetableView } from '@/pages/student/StudentPages'
+import { CapsSubjectsBanner, QuickLinks } from '@/pages/shared/ProductionPages'
 
 export function TeacherDashboard() {
+  useApiRefresh()
   const { user } = useAuth()
   if (!user) return null
   const classes = api.teacherClassSubjects(user.id)
   const assessments = api.listAssessments().filter((a) =>
     classes.some((cs) => cs.id === a.classSubjectId),
   )
+  const homework = api.listHomework().filter((h) => h.createdBy === user.id)
+  const submissions = homework.flatMap((h) => api.listHomeworkSubmissions(h.id))
+  const pending = submissions.filter((s) => s.status === 'submitted' || s.status === 'late').length
+
   return (
-    <div>
-      <PageHeader title={`Good day, ${user.profile.firstName}`} description="Teaching workspace" />
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader title={`Good day, ${user.profile.firstName}`} description="CAPS teaching workspace" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Class subjects" value={classes.length} />
         <StatCard title="Assessments" value={assessments.length} />
-        <StatCard title="Homework" value={api.listHomework().filter((h) => h.createdBy === user.id).length} />
-        <StatCard title="Materials" value={api.listMaterials().filter((m) => m.uploadedBy === user.id).length} />
+        <StatCard title="Homework set" value={homework.length} />
+        <StatCard title="Submissions to review" value={pending} />
       </div>
+      <CapsSubjectsBanner />
+      <QuickLinks
+        items={[
+          { to: '/teacher/marks', label: 'Capture marks', hint: 'SBA, tests & exams' },
+          { to: '/teacher/homework', label: 'Assignments', hint: 'Publish & grade uploads' },
+          { to: '/teacher/attendance', label: 'Attendance', hint: 'Present · late · absent' },
+          { to: '/teacher/materials', label: 'Learning materials', hint: 'Upload CAPS resources' },
+          { to: '/teacher/messages', label: 'Messages', hint: 'Parents & learners' },
+          { to: '/teacher/progress', label: 'Progress', hint: 'Learner tracking' },
+        ]}
+      />
       <Card>
         <CardHeader>
           <CardTitle>Your timetable today</CardTitle>
@@ -385,39 +404,46 @@ export function TeacherSubjectsPage() {
 }
 
 export function TeacherMaterialsPage() {
+  useApiRefresh()
   const { user } = useAuth()
   const [classSubjectId, setClassSubjectId] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [fileName, setFileName] = useState('')
-  const [, setTick] = useState(0)
+  const [file, setFile] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
 
   if (!user) return null
   const myCs = api.teacherClassSubjects(user.id)
   const materials = api.listMaterials().filter((m) => myCs.some((cs) => cs.id === m.classSubjectId))
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Upload Learning Material" />
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader title="Upload Learning Material" description="Share CAPS-aligned resources with your classes" />
       <Card>
         <CardContent className="p-5">
           <form
             className="grid gap-3"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault()
-              api.createMaterial({
-                classSubjectId,
-                title,
-                description,
-                fileUrl: `#${fileName || 'material.pdf'}`,
-                fileType: fileName.split('.').pop() ?? 'pdf',
-                uploadedBy: user.id,
-              })
-              setTitle('')
-              setDescription('')
-              setFileName('')
-              setTick((t) => t + 1)
-              toast.success('Material uploaded')
+              if (!file) return toast.error('Choose a file')
+              setBusy(true)
+              try {
+                await api.uploadLearningMaterial({
+                  classSubjectId,
+                  title,
+                  description,
+                  file,
+                  uploadedBy: user.id,
+                })
+                setTitle('')
+                setDescription('')
+                setFile(null)
+                toast.success('Material uploaded to cloud storage')
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : 'Upload failed')
+              } finally {
+                setBusy(false)
+              }
             }}
           >
             <div className="space-y-2">
@@ -443,26 +469,166 @@ export function TeacherMaterialsPage() {
               <Label>File</Label>
               <Input
                 type="file"
-                onChange={(e) => setFileName(e.target.files?.[0]?.name ?? '')}
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 required
               />
             </div>
-            <Button type="submit">Upload</Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? 'Uploading…' : 'Upload material'}
+            </Button>
           </form>
         </CardContent>
       </Card>
       <div className="space-y-2">
         {materials.map((m) => (
           <Card key={m.id}>
-            <CardContent className="flex items-center justify-between p-4">
+            <CardContent className="flex items-center justify-between gap-3 p-4">
               <div>
                 <p className="font-medium text-sm">{m.title}</p>
                 <p className="text-xs text-muted-foreground">{m.description}</p>
               </div>
-              <Badge variant="secondary">{m.fileType}</Badge>
+              <a href={m.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
+                Open
+              </a>
             </CardContent>
           </Card>
         ))}
+        {materials.length === 0 ? <EmptyState title="No materials yet" /> : null}
+      </div>
+    </div>
+  )
+}
+
+export function TeacherHomeworkPage() {
+  useApiRefresh()
+  const { user } = useAuth()
+  const [classSubjectId, setClassSubjectId] = useState('')
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [dueDate, setDueDate] = useState(todayISO())
+  const [file, setFile] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  if (!user) return null
+  const myCs = api.teacherClassSubjects(user.id)
+  const homework = api.listHomework().filter((h) => myCs.some((cs) => cs.id === h.classSubjectId))
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader title="Assignments & Homework" description="Publish tasks and review learner uploads" />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Create assignment</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-3 sm:grid-cols-2"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              setBusy(true)
+              try {
+                await api.createHomeworkWithAttachment({
+                  classSubjectId,
+                  title,
+                  description,
+                  dueDate,
+                  createdBy: user.id,
+                  file: file || undefined,
+                })
+                setTitle('')
+                setDescription('')
+                setFile(null)
+                toast.success('Assignment published')
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : 'Failed')
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
+            <Select value={classSubjectId} onChange={(e) => setClassSubjectId(e.target.value)} required>
+              <option value="">Class subject…</option>
+              {myCs.map((cs) => (
+                <option key={cs.id} value={cs.id}>
+                  {api.getClass(cs.classId)?.name} — {api.getSubject(cs.subjectId)?.name}
+                </option>
+              ))}
+            </Select>
+            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+            <Input className="sm:col-span-2" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" required />
+            <Textarea className="sm:col-span-2" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Instructions" />
+            <Input type="file" className="sm:col-span-2" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <Button type="submit" disabled={busy}>
+              {busy ? 'Publishing…' : 'Publish assignment'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <div className="space-y-4">
+        {homework.map((h) => {
+          const subs = api.listHomeworkSubmissions(h.id)
+          const subject = api.getSubject(api.getClassSubject(h.classSubjectId)?.subjectId ?? '')
+          return (
+            <Card key={h.id}>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  {h.title}{' '}
+                  <span className="text-muted-foreground font-normal text-sm">· {subject?.name}</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">{h.description}</p>
+                <Badge variant="secondary">Due {formatDate(h.dueDate)}</Badge>
+                {h.attachmentUrl ? (
+                  <a href={h.attachmentUrl} className="block text-xs text-primary hover:underline" target="_blank" rel="noreferrer">
+                    Teacher attachment
+                  </a>
+                ) : null}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Submissions ({subs.length})</p>
+                  {subs.map((s) => {
+                    const st = api.students.find((x) => x.id === s.studentId)
+                    const p = st ? api.getProfile(st.profileId) : undefined
+                    return (
+                      <div key={s.id} className="flex flex-col gap-2 rounded-xl border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-medium">{p ? fullName(p.firstName, p.lastName) : 'Learner'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {s.fileName || 'No file'} · {s.status}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          {s.fileUrl ? (
+                            <a href={s.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline self-center">
+                              Open
+                            </a>
+                          ) : null}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              try {
+                                await api.gradeHomeworkSubmission(s.id, 'graded')
+                                toast.success('Marked as graded')
+                              } catch (err) {
+                                toast.error(err instanceof Error ? err.message : 'Failed')
+                              }
+                            }}
+                          >
+                            Mark graded
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {subs.length === 0 ? <p className="text-xs text-muted-foreground">No submissions yet.</p> : null}
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+        {homework.length === 0 ? <EmptyState title="No assignments yet" /> : null}
       </div>
     </div>
   )

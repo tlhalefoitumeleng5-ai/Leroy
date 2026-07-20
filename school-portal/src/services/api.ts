@@ -6,9 +6,16 @@ import type {
   AttendanceRecord,
   AttendanceStatus,
   AuditLog,
+  AiTutorMessage,
+  AiTutorSession,
   CalendarEvent,
+  ChatMessage,
   ClassRoom,
   ClassSubject,
+  Conversation,
+  FeeInvoice,
+  FeePayment,
+  FeeStructure,
   ForumComment,
   ForumPost,
   ForumReport,
@@ -27,9 +34,11 @@ import type {
   TimetableSlot,
   ApplicationStatus,
   UserRole,
+  WhatsAppOutboxItem,
 } from '@/types'
 import { requireSupabase } from '@/lib/supabase'
 import { todayISO } from '@/lib/utils'
+import { generateTutorReply } from '@/lib/caps-tutor'
 
 type Listener = () => void
 
@@ -80,6 +89,14 @@ class LiveApi {
   forumReports: ForumReport[] = []
   auditLogs: AuditLog[] = []
   homeworkSubmissions: HomeworkSubmission[] = []
+  feeStructures: FeeStructure[] = []
+  feeInvoices: FeeInvoice[] = []
+  feePayments: FeePayment[] = []
+  conversations: Conversation[] = []
+  messages: ChatMessage[] = []
+  aiSessions: AiTutorSession[] = []
+  aiMessages: AiTutorMessage[] = []
+  whatsappOutbox: WhatsAppOutboxItem[] = []
 
   subscribe(fn: Listener) {
     this.listeners.add(fn)
@@ -119,6 +136,14 @@ class LiveApi {
       forumReports: this.forumReports,
       auditLogs: this.auditLogs,
       passwords: {} as Record<string, string>,
+      feeStructures: this.feeStructures,
+      feeInvoices: this.feeInvoices,
+      feePayments: this.feePayments,
+      conversations: this.conversations,
+      messages: this.messages,
+      aiSessions: this.aiSessions,
+      aiMessages: this.aiMessages,
+      whatsappOutbox: this.whatsappOutbox,
     }
   }
 
@@ -151,6 +176,15 @@ class LiveApi {
       forumReports,
       auditLogs,
       homeworkSubmissions,
+      feeStructures,
+      feeInvoices,
+      feePayments,
+      conversations,
+      conversationParticipants,
+      messages,
+      aiSessions,
+      aiMessages,
+      whatsappOutbox,
     ] = await Promise.all([
       sb.from('schools').select('*'),
       sb.from('profiles').select('*'),
@@ -178,13 +212,23 @@ class LiveApi {
       sb.from('forum_reports').select('*'),
       sb.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200),
       sb.from('homework_submissions').select('*'),
+      sb.from('fee_structures').select('*').order('created_at', { ascending: false }),
+      sb.from('fee_invoices').select('*').order('issued_at', { ascending: false }),
+      sb.from('fee_payments').select('*').order('received_at', { ascending: false }),
+      sb.from('conversations').select('*').order('updated_at', { ascending: false }),
+      sb.from('conversation_participants').select('*'),
+      sb.from('messages').select('*').order('created_at', { ascending: true }).limit(2000),
+      sb.from('ai_tutor_sessions').select('*').order('updated_at', { ascending: false }),
+      sb.from('ai_tutor_messages').select('*').order('created_at', { ascending: true }).limit(2000),
+      sb.from('whatsapp_outbox').select('*').order('created_at', { ascending: false }).limit(200),
     ])
 
     const err = [
       schools, profiles, grades, classes, subjects, classSubjects, teachers, students, parents,
       parentStudents, admissions, attendance, assessments, marks, homework, materials, timetable,
       calendar, announcements, notifications, forumPosts, forumComments, forumLikes, forumReports, auditLogs,
-      homeworkSubmissions,
+      homeworkSubmissions, feeStructures, feeInvoices, feePayments, conversations, conversationParticipants,
+      messages, aiSessions, aiMessages, whatsappOutbox,
     ].find((r) => r.error)
     if (err?.error) throw err.error
 
@@ -198,6 +242,14 @@ class LiveApi {
           phone: schoolRow.phone ?? undefined,
           email: schoolRow.email ?? undefined,
           logoUrl: schoolRow.logo_url ?? undefined,
+          whatsappEnabled: Boolean(schoolRow.whatsapp_enabled),
+          whatsappProvider: schoolRow.whatsapp_provider ?? undefined,
+          whatsappFrom: schoolRow.whatsapp_from ?? undefined,
+          whatsappAccountSid: schoolRow.whatsapp_account_sid ?? undefined,
+          whatsappAuthToken: schoolRow.whatsapp_auth_token ?? undefined,
+          whatsappNotifyAttendance: schoolRow.whatsapp_notify_attendance ?? true,
+          whatsappNotifyAnnouncements: schoolRow.whatsapp_notify_announcements ?? true,
+          whatsappNotifyFees: schoolRow.whatsapp_notify_fees ?? true,
         }
       : this.school
 
@@ -222,6 +274,10 @@ class LiveApi {
       code: s.code,
       name: s.name,
       description: s.description ?? undefined,
+      capsCode: s.caps_code ?? undefined,
+      phase: s.phase ?? undefined,
+      capsWeightingSba: s.caps_weighting_sba != null ? Number(s.caps_weighting_sba) : 25,
+      capsWeightingExam: s.caps_weighting_exam != null ? Number(s.caps_weighting_exam) : 75,
     }))
     this.classSubjects = (classSubjects.data ?? []).map((cs) => ({
       id: cs.id,
@@ -439,6 +495,95 @@ class LiveApi {
       notes: s.notes ?? undefined,
       status: s.status,
       submittedAt: s.submitted_at,
+    }))
+
+    const participantsByConv = new Map<string, string[]>()
+    for (const p of conversationParticipants.data ?? []) {
+      const arr = participantsByConv.get(p.conversation_id) ?? []
+      arr.push(p.user_id)
+      participantsByConv.set(p.conversation_id, arr)
+    }
+    this.conversations = (conversations.data ?? []).map((c) => ({
+      id: c.id,
+      schoolId: c.school_id,
+      subject: c.subject ?? undefined,
+      createdBy: c.created_by,
+      createdAt: c.created_at,
+      updatedAt: c.updated_at,
+      participantIds: participantsByConv.get(c.id) ?? [],
+    }))
+    this.messages = (messages.data ?? []).map((m) => ({
+      id: m.id,
+      conversationId: m.conversation_id,
+      senderId: m.sender_id,
+      body: m.body,
+      createdAt: m.created_at,
+      isDeleted: Boolean(m.is_deleted),
+    }))
+    this.feeStructures = (feeStructures.data ?? []).map((f) => ({
+      id: f.id,
+      schoolId: f.school_id,
+      name: f.name,
+      description: f.description ?? undefined,
+      amountCents: f.amount_cents,
+      gradeId: f.grade_id ?? undefined,
+      academicYear: f.academic_year,
+      dueDate: f.due_date ?? undefined,
+      isActive: Boolean(f.is_active),
+      createdAt: f.created_at,
+    }))
+    this.feeInvoices = (feeInvoices.data ?? []).map((i) => ({
+      id: i.id,
+      schoolId: i.school_id,
+      studentId: i.student_id,
+      feeStructureId: i.fee_structure_id ?? undefined,
+      invoiceNumber: i.invoice_number,
+      description: i.description,
+      amountCents: i.amount_cents,
+      amountPaidCents: i.amount_paid_cents,
+      status: i.status,
+      dueDate: i.due_date ?? undefined,
+      issuedAt: i.issued_at,
+    }))
+    this.feePayments = (feePayments.data ?? []).map((p) => ({
+      id: p.id,
+      schoolId: p.school_id,
+      invoiceId: p.invoice_id,
+      amountCents: p.amount_cents,
+      method: p.method,
+      reference: p.reference ?? undefined,
+      receivedAt: p.received_at,
+      recordedBy: p.recorded_by ?? undefined,
+      notes: p.notes ?? undefined,
+    }))
+    this.aiSessions = (aiSessions.data ?? []).map((s) => ({
+      id: s.id,
+      schoolId: s.school_id,
+      studentId: s.student_id,
+      subjectId: s.subject_id ?? undefined,
+      title: s.title,
+      createdAt: s.created_at,
+      updatedAt: s.updated_at,
+    }))
+    this.aiMessages = (aiMessages.data ?? []).map((m) => ({
+      id: m.id,
+      sessionId: m.session_id,
+      role: m.role,
+      content: m.content,
+      createdAt: m.created_at,
+    }))
+    this.whatsappOutbox = (whatsappOutbox.data ?? []).map((w) => ({
+      id: w.id,
+      schoolId: w.school_id,
+      toPhone: w.to_phone,
+      body: w.body,
+      relatedType: w.related_type ?? undefined,
+      relatedId: w.related_id ?? undefined,
+      status: w.status,
+      providerMessageId: w.provider_message_id ?? undefined,
+      error: w.error ?? undefined,
+      createdAt: w.created_at,
+      sentAt: w.sent_at ?? undefined,
     }))
 
     this.ready = true
@@ -1147,6 +1292,382 @@ class LiveApi {
   }
   teacherClassSubjects(teacherId: string) {
     return this.classSubjects.filter((cs) => cs.teacherId === teacherId)
+  }
+
+  // ---- Fees ----
+  listFeeStructures() {
+    return [...this.feeStructures]
+  }
+  listFeeInvoices(studentId?: string) {
+    return this.feeInvoices.filter((i) => !studentId || i.studentId === studentId)
+  }
+  listFeePayments(invoiceId?: string) {
+    return this.feePayments.filter((p) => !invoiceId || p.invoiceId === invoiceId)
+  }
+
+  async createFeeStructure(data: {
+    name: string
+    description?: string
+    amountCents: number
+    gradeId?: string
+    academicYear: string
+    dueDate?: string
+  }) {
+    const sb = requireSupabase()
+    const { error } = await sb.from('fee_structures').insert({
+      school_id: this.school.id,
+      name: data.name,
+      description: data.description,
+      amount_cents: data.amountCents,
+      grade_id: data.gradeId || null,
+      academic_year: data.academicYear,
+      due_date: data.dueDate || null,
+    })
+    if (error) throw error
+    await this.refresh()
+  }
+
+  async generateInvoicesFromStructure(structureId: string, actorId?: string) {
+    const sb = requireSupabase()
+    const structure = this.feeStructures.find((f) => f.id === structureId)
+    if (!structure) throw new Error('Fee structure not found')
+    const targets = this.students.filter((s) => !structure.gradeId || s.gradeId === structure.gradeId)
+    const rows = targets.map((s, idx) => ({
+      school_id: this.school.id,
+      student_id: s.id,
+      fee_structure_id: structure.id,
+      invoice_number: `INV-${structure.academicYear}-${Date.now().toString().slice(-6)}-${idx + 1}`,
+      description: structure.name,
+      amount_cents: structure.amountCents,
+      amount_paid_cents: 0,
+      status: 'unpaid',
+      due_date: structure.dueDate || null,
+    }))
+    if (rows.length) {
+      const { error } = await sb.from('fee_invoices').insert(rows)
+      if (error) throw error
+    }
+    await this.addAudit(actorId, 'GENERATE_FEE_INVOICES', 'fee_structures', structureId, { count: rows.length })
+    await this.refresh()
+    return rows.length
+  }
+
+  async recordFeePayment(input: {
+    invoiceId: string
+    amountCents: number
+    method: FeePayment['method']
+    reference?: string
+    notes?: string
+    recordedBy?: string
+  }) {
+    const sb = requireSupabase()
+    const invoice = this.feeInvoices.find((i) => i.id === input.invoiceId)
+    if (!invoice) throw new Error('Invoice not found')
+    const { error } = await sb.from('fee_payments').insert({
+      school_id: this.school.id,
+      invoice_id: input.invoiceId,
+      amount_cents: input.amountCents,
+      method: input.method,
+      reference: input.reference,
+      notes: input.notes,
+      recorded_by: input.recordedBy,
+    })
+    if (error) throw error
+    const paid = invoice.amountPaidCents + input.amountCents
+    const status = paid >= invoice.amountCents ? 'paid' : paid > 0 ? 'partial' : invoice.status
+    await sb
+      .from('fee_invoices')
+      .update({ amount_paid_cents: Math.min(paid, invoice.amountCents), status })
+      .eq('id', invoice.id)
+    await this.refresh()
+  }
+
+  // ---- Messaging ----
+  listConversationsForUser(userId: string) {
+    return this.conversations.filter((c) => c.participantIds.includes(userId))
+  }
+  listMessages(conversationId: string) {
+    return this.messages.filter((m) => m.conversationId === conversationId && !m.isDeleted)
+  }
+
+  async startConversation(input: { createdBy: string; participantIds: string[]; subject?: string; body: string }) {
+    const sb = requireSupabase()
+    const { data: conv, error } = await sb
+      .from('conversations')
+      .insert({
+        school_id: this.school.id,
+        subject: input.subject,
+        created_by: input.createdBy,
+      })
+      .select('*')
+      .single()
+    if (error) throw error
+    const participants = Array.from(new Set([input.createdBy, ...input.participantIds]))
+    const { error: pErr } = await sb.from('conversation_participants').insert(
+      participants.map((userId) => ({ conversation_id: conv.id, user_id: userId })),
+    )
+    if (pErr) throw pErr
+    const { error: mErr } = await sb.from('messages').insert({
+      conversation_id: conv.id,
+      sender_id: input.createdBy,
+      body: input.body,
+    })
+    if (mErr) throw mErr
+    await sb.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', conv.id)
+    await this.refresh()
+    return conv.id as string
+  }
+
+  async sendMessage(conversationId: string, senderId: string, body: string) {
+    const sb = requireSupabase()
+    const { error } = await sb.from('messages').insert({
+      conversation_id: conversationId,
+      sender_id: senderId,
+      body,
+    })
+    if (error) throw error
+    await sb.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId)
+    await this.refresh()
+  }
+
+  // ---- AI Tutor ----
+  listAiSessions(studentId: string) {
+    return this.aiSessions.filter((s) => s.studentId === studentId)
+  }
+  listAiMessages(sessionId: string) {
+    return this.aiMessages.filter((m) => m.sessionId === sessionId)
+  }
+
+  async askAiTutor(input: { studentId: string; subjectId?: string; question: string; sessionId?: string }) {
+    const sb = requireSupabase()
+    let sessionId = input.sessionId
+    const subject = input.subjectId ? this.getSubject(input.subjectId) : undefined
+    if (!sessionId) {
+      const { data, error } = await sb
+        .from('ai_tutor_sessions')
+        .insert({
+          school_id: this.school.id,
+          student_id: input.studentId,
+          subject_id: input.subjectId || null,
+          title: subject ? `${subject.name} tutoring` : 'CAPS study session',
+        })
+        .select('*')
+        .single()
+      if (error) throw error
+      sessionId = data.id
+    }
+    await sb.from('ai_tutor_messages').insert({
+      session_id: sessionId,
+      role: 'user',
+      content: input.question,
+    })
+    const reply = await generateTutorReply(input.question, subject?.name)
+    await sb.from('ai_tutor_messages').insert({
+      session_id: sessionId,
+      role: 'assistant',
+      content: reply,
+    })
+    await sb.from('ai_tutor_sessions').update({ updated_at: new Date().toISOString() }).eq('id', sessionId)
+    await this.refresh()
+    return { sessionId: sessionId!, reply }
+  }
+
+  // ---- WhatsApp ----
+  listWhatsAppOutbox() {
+    return [...this.whatsappOutbox]
+  }
+
+  async updateWhatsAppSettings(patch: Partial<School>) {
+    const sb = requireSupabase()
+    const { error } = await sb
+      .from('schools')
+      .update({
+        whatsapp_enabled: patch.whatsappEnabled,
+        whatsapp_provider: patch.whatsappProvider,
+        whatsapp_from: patch.whatsappFrom,
+        whatsapp_account_sid: patch.whatsappAccountSid,
+        whatsapp_auth_token: patch.whatsappAuthToken,
+        whatsapp_notify_attendance: patch.whatsappNotifyAttendance,
+        whatsapp_notify_announcements: patch.whatsappNotifyAnnouncements,
+        whatsapp_notify_fees: patch.whatsappNotifyFees,
+      })
+      .eq('id', this.school.id)
+    if (error) throw error
+    await this.refresh()
+  }
+
+  async queueWhatsApp(toPhone: string, body: string, relatedType?: string, relatedId?: string) {
+    const sb = requireSupabase()
+    const { error } = await sb.from('whatsapp_outbox').insert({
+      school_id: this.school.id,
+      to_phone: toPhone,
+      body,
+      related_type: relatedType,
+      related_id: relatedId,
+    })
+    if (error) throw error
+    await this.refresh()
+  }
+
+  /** Attempts Twilio WhatsApp send for pending outbox items when credentials exist. */
+  async dispatchWhatsAppQueue() {
+    const school = this.school
+    if (!school.whatsappEnabled || !school.whatsappAccountSid || !school.whatsappAuthToken || !school.whatsappFrom) {
+      throw new Error('Configure WhatsApp credentials in Admin → WhatsApp before sending.')
+    }
+    const pending = this.whatsappOutbox.filter((w) => w.status === 'pending')
+    const sb = requireSupabase()
+    let sent = 0
+    for (const item of pending) {
+      try {
+        const auth = btoa(`${school.whatsappAccountSid}:${school.whatsappAuthToken}`)
+        const to = item.toPhone.startsWith('whatsapp:') ? item.toPhone : `whatsapp:${item.toPhone}`
+        const from = school.whatsappFrom.startsWith('whatsapp:')
+          ? school.whatsappFrom
+          : `whatsapp:${school.whatsappFrom}`
+        const body = new URLSearchParams({ To: to, From: from, Body: item.body })
+        const res = await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${school.whatsappAccountSid}/Messages.json`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Basic ${auth}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body,
+          },
+        )
+        const json = (await res.json()) as { sid?: string; message?: string }
+        if (!res.ok) {
+          await sb
+            .from('whatsapp_outbox')
+            .update({ status: 'failed', error: json.message || `HTTP ${res.status}` })
+            .eq('id', item.id)
+        } else {
+          await sb
+            .from('whatsapp_outbox')
+            .update({
+              status: 'sent',
+              provider_message_id: json.sid,
+              sent_at: new Date().toISOString(),
+              error: null,
+            })
+            .eq('id', item.id)
+          sent += 1
+        }
+      } catch (e) {
+        await sb
+          .from('whatsapp_outbox')
+          .update({ status: 'failed', error: e instanceof Error ? e.message : 'Send failed' })
+          .eq('id', item.id)
+      }
+    }
+    await this.refresh()
+    return { processed: pending.length, sent }
+  }
+
+  // ---- Timetable CRUD ----
+  async upsertTimetableSlot(data: {
+    id?: string
+    classId: string
+    subjectId: string
+    teacherId?: string
+    dayOfWeek: number
+    periodNumber: number
+    startTime: string
+    endTime: string
+    room?: string
+  }) {
+    const sb = requireSupabase()
+    const payload = {
+      school_id: this.school.id,
+      class_id: data.classId,
+      subject_id: data.subjectId,
+      teacher_id: data.teacherId || null,
+      day_of_week: data.dayOfWeek,
+      period_number: data.periodNumber,
+      start_time: data.startTime,
+      end_time: data.endTime,
+      room: data.room || null,
+    }
+    if (data.id) {
+      const { error } = await sb.from('timetable_slots').update(payload).eq('id', data.id)
+      if (error) throw error
+    } else {
+      const { error } = await sb.from('timetable_slots').upsert(payload, {
+        onConflict: 'class_id,day_of_week,period_number',
+      })
+      if (error) throw error
+    }
+    await this.refresh()
+  }
+
+  async deleteTimetableSlot(id: string) {
+    const sb = requireSupabase()
+    const { error } = await sb.from('timetable_slots').delete().eq('id', id)
+    if (error) throw error
+    await this.refresh()
+  }
+
+  // ---- Materials / homework attachments ----
+  async uploadLearningMaterial(input: {
+    classSubjectId: string
+    title: string
+    description?: string
+    file: File
+    uploadedBy: string
+  }) {
+    const sb = requireSupabase()
+    const path = `${input.uploadedBy}/${Date.now()}-${input.file.name}`
+    const { error: upErr } = await sb.storage.from('learning-materials').upload(path, input.file, { upsert: true })
+    if (upErr) throw upErr
+    const { data } = sb.storage.from('learning-materials').getPublicUrl(path)
+    await this.createMaterial({
+      classSubjectId: input.classSubjectId,
+      title: input.title,
+      description: input.description,
+      fileUrl: data.publicUrl,
+      fileType: input.file.type || input.file.name.split('.').pop(),
+      uploadedBy: input.uploadedBy,
+    })
+  }
+
+  async createHomeworkWithAttachment(input: {
+    classSubjectId: string
+    title: string
+    description?: string
+    dueDate: string
+    createdBy: string
+    file?: File
+  }) {
+    let attachmentUrl: string | undefined
+    if (input.file) {
+      const sb = requireSupabase()
+      const path = `${input.createdBy}/${Date.now()}-${input.file.name}`
+      const { error: upErr } = await sb.storage.from('assignments').upload(path, input.file, { upsert: true })
+      if (upErr) throw upErr
+      const { data } = await sb.storage.from('assignments').createSignedUrl(path, 60 * 60 * 24 * 30)
+      attachmentUrl = data?.signedUrl
+    }
+    await this.createHomework({
+      classSubjectId: input.classSubjectId,
+      title: input.title,
+      description: input.description,
+      dueDate: input.dueDate,
+      attachmentUrl,
+      createdBy: input.createdBy,
+    })
+  }
+
+  async gradeHomeworkSubmission(id: string, status: HomeworkSubmission['status'] = 'graded') {
+    const sb = requireSupabase()
+    const { error } = await sb.from('homework_submissions').update({ status }).eq('id', id)
+    if (error) throw error
+    await this.refresh()
+  }
+
+  listHomeworkSubmissions(homeworkId?: string) {
+    return this.homeworkSubmissions.filter((s) => !homeworkId || s.homeworkId === homeworkId)
   }
 
   // Compatibility stubs used by old demo auth (unused with live auth)

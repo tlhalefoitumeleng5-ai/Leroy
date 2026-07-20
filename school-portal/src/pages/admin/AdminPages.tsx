@@ -1,4 +1,14 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import {
+  Bell,
+  ClipboardList,
+  CreditCard,
+  GraduationCap,
+  Megaphone,
+  MessageSquare,
+  Users,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/auth-context'
 import { api } from '@/services/api'
@@ -18,21 +28,81 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input, Select, Textarea } from '@/components/ui/input'
 import { formatDate, formatDateTime, fullName } from '@/lib/utils'
+import { formatZar } from '@/lib/caps-tutor'
+import { useApiRefresh } from '@/lib/student-helpers'
 import type { ApplicationStatus } from '@/types'
 import { TimetableView } from '@/pages/student/StudentPages'
+import { CapsSubjectsBanner, QuickLinks } from '@/pages/shared/ProductionPages'
 
 export function AdminDashboard() {
+  useApiRefresh()
+  const pending = api.listAdmissions().filter((a) => a.status === 'pending').length
+  const invoices = api.listFeeInvoices()
+  const owed = invoices.reduce((s, i) => s + Math.max(0, i.amountCents - i.amountPaidCents), 0)
+  const unreadWa = api.listWhatsAppOutbox().filter((w) => w.status === 'pending').length
+  const announcements = api.listAnnouncements().slice(0, 3)
+
   return (
-    <div>
-      <PageHeader title="School Administration" description="Manage people, academics, and operations" />
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title="School Administration"
+        description="Production operations for Horizon High · CAPS-ready SMS"
+      />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Students" value={api.listStudents().length} />
-        <StatCard title="Teachers" value={api.listTeachers().length} />
-        <StatCard title="Parents" value={api.listParents().length} />
-        <StatCard
-          title="Pending admissions"
-          value={api.listAdmissions().filter((a) => a.status === 'pending').length}
-        />
+        <StatCard title="Students" value={api.listStudents().length} icon={<GraduationCap className="h-5 w-5" />} />
+        <StatCard title="Teachers" value={api.listTeachers().length} icon={<Users className="h-5 w-5" />} />
+        <StatCard title="Pending admissions" value={pending} icon={<ClipboardList className="h-5 w-5" />} />
+        <StatCard title="Fees outstanding" value={formatZar(owed)} icon={<CreditCard className="h-5 w-5" />} />
+      </div>
+      <CapsSubjectsBanner />
+      <QuickLinks
+        items={[
+          { to: '/admin/fees', label: 'School fees', hint: 'Structures, invoices & payments' },
+          { to: '/admin/announcements', label: 'Announcements', hint: 'Notify the whole school' },
+          { to: '/admin/whatsapp', label: 'WhatsApp', hint: `${unreadWa} pending in outbox` },
+          { to: '/admin/messages', label: 'Messages', hint: 'Staff ↔ parent ↔ learner' },
+          { to: '/admin/timetable', label: 'Timetable editor', hint: 'Create and edit slots' },
+          { to: '/admin/admissions', label: 'Admissions', hint: 'Review applications' },
+        ]}
+      />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Megaphone className="h-4 w-4 text-primary" /> Latest announcements
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {announcements.map((a) => (
+              <div key={a.id} className="rounded-xl border border-border p-3">
+                <p className="text-sm font-medium">{a.title}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2">{a.body}</p>
+              </div>
+            ))}
+            {announcements.length === 0 ? <EmptyState title="No announcements" /> : null}
+            <Link to="/admin/announcements" className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-xs font-medium hover:bg-muted">
+              Manage announcements
+            </Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Bell className="h-4 w-4 text-primary" /> Operations snapshot
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 text-sm">
+            <p>Parents: {api.listParents().length}</p>
+            <p>Homework items: {api.listHomework().length}</p>
+            <p>WhatsApp pending: {unreadWa}</p>
+            <Link to="/admin/messages" className="inline-flex items-center gap-1 text-primary text-sm hover:underline">
+              <MessageSquare className="h-3.5 w-3.5" /> Open messages
+            </Link>
+            <Link to="/admin/reports" className="mt-2 inline-flex h-8 w-fit items-center rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground">
+              View reports
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
@@ -419,15 +489,90 @@ export function AdminClassesPage() {
 }
 
 export function AdminTimetablePage() {
+  useApiRefresh()
   const [classId, setClassId] = useState(api.listClasses()[0]?.id ?? '')
   const [gradeId, setGradeId] = useState('')
   const [teacherId, setTeacherId] = useState('')
   const [subjectId, setSubjectId] = useState('')
   const [filter, setFilter] = useState<'class' | 'grade' | 'teacher' | 'subject'>('class')
+  const [dayOfWeek, setDayOfWeek] = useState('1')
+  const [periodNumber, setPeriodNumber] = useState('1')
+  const [slotSubjectId, setSlotSubjectId] = useState('')
+  const [slotTeacherId, setSlotTeacherId] = useState('')
+  const [startTime, setStartTime] = useState('08:00')
+  const [endTime, setEndTime] = useState('08:45')
+  const [room, setRoom] = useState('')
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Manage Timetable" description="View by class, grade, teacher, or subject" />
+      <PageHeader title="Manage Timetable" description="Create, edit and view CAPS weekly schedules" />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Add / update slot</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              try {
+                await api.upsertTimetableSlot({
+                  classId,
+                  subjectId: slotSubjectId,
+                  teacherId: slotTeacherId || undefined,
+                  dayOfWeek: Number(dayOfWeek),
+                  periodNumber: Number(periodNumber),
+                  startTime,
+                  endTime,
+                  room: room || undefined,
+                })
+                toast.success('Timetable slot saved')
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : 'Save failed')
+              }
+            }}
+          >
+            <Select value={classId} onChange={(e) => setClassId(e.target.value)} required>
+              {api.listClasses().map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+            <Select value={slotSubjectId} onChange={(e) => setSlotSubjectId(e.target.value)} required>
+              <option value="">Subject…</option>
+              {api.listSubjects().map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </Select>
+            <Select value={slotTeacherId} onChange={(e) => setSlotTeacherId(e.target.value)}>
+              <option value="">Teacher…</option>
+              {api.listTeachers().map((t) => {
+                const p = api.getProfile(t.profileId)
+                return (
+                  <option key={t.profileId} value={t.profileId}>
+                    {p ? fullName(p.firstName, p.lastName) : t.employeeNumber}
+                  </option>
+                )
+              })}
+            </Select>
+            <Select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)}>
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+            </Select>
+            <Input type="number" min={1} max={10} value={periodNumber} onChange={(e) => setPeriodNumber(e.target.value)} placeholder="Period" />
+            <Input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Classroom" />
+            <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+            <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+            <Button type="submit">Save slot</Button>
+          </form>
+        </CardContent>
+      </Card>
       <div className="flex flex-wrap gap-2">
         {(['class', 'grade', 'teacher', 'subject'] as const).map((f) => (
           <Button key={f} size="sm" variant={filter === f ? 'default' : 'outline'} onClick={() => setFilter(f)}>
@@ -593,21 +738,29 @@ export function AdminAdmissionsPage() {
 }
 
 export function AdminReportsPage() {
+  useApiRefresh()
   const presentToday = api
     .getDb()
     .attendance.filter((a) => a.date === new Date().toISOString().slice(0, 10) && a.status === 'present').length
+  const invoices = api.listFeeInvoices()
+  const collected = invoices.reduce((s, i) => s + i.amountPaidCents, 0)
+  const owed = invoices.reduce((s, i) => s + Math.max(0, i.amountCents - i.amountPaidCents), 0)
 
   return (
-    <div>
-      <PageHeader title="Reports" description="Operational school reports" />
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader title="Reports" description="Operational and financial school reports" />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard title="Total students" value={api.listStudents().length} />
         <StatCard title="Present today" value={presentToday} />
         <StatCard title="Assessments" value={api.listAssessments().length} />
+        <StatCard title="Fees collected" value={formatZar(collected)} />
+        <StatCard title="Fees outstanding" value={formatZar(owed)} />
         <StatCard title="Admissions pending" value={api.listAdmissions().filter((a) => a.status === 'pending').length} />
         <StatCard title="Forum posts" value={api.getDb().forumPosts.length} />
+        <StatCard title="WhatsApp pending" value={api.listWhatsAppOutbox().filter((w) => w.status === 'pending').length} />
         <StatCard title="Audit events" value={api.listAuditLogs().length} />
       </div>
+      <CapsSubjectsBanner />
     </div>
   )
 }
@@ -690,12 +843,13 @@ export function AdminAnnouncementsPage() {
                 pinned,
                 audience: ['all'],
                 createdBy: user?.id,
-              })
-              setTitle('')
-              setBody('')
-              setPinned(false)
-              setTick((t) => t + 1)
-              toast.success('Announcement published')
+              }).then(() => {
+                setTitle('')
+                setBody('')
+                setPinned(false)
+                setTick((t) => t + 1)
+                toast.success('Announcement published — notifications queued')
+              }).catch((err) => toast.error(err instanceof Error ? err.message : 'Publish failed'))
             }}
           >
             Publish
