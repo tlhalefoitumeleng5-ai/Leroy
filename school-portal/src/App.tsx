@@ -66,9 +66,9 @@ import {
   AdminWhatsAppPage,
   MessagingPage,
   ParentFeesPage,
-  StudentAiTutorPage,
   StudentFeesPage,
 } from '@/pages/shared/ProductionPages'
+import { StudentAiTutorPage } from '@/pages/student/AiTutorPage'
 
 function HomeRedirect() {
   const { user, loading } = useAuth()

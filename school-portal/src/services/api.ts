@@ -38,7 +38,12 @@ import type {
 } from '@/types'
 import { requireSupabase } from '@/lib/supabase'
 import { todayISO } from '@/lib/utils'
-import { generateTutorReply } from '@/lib/caps-tutor'
+import {
+  buildCapsSystemPrompt,
+  generateTutorReply,
+  type TutorChatMessage,
+  type TutorMode,
+} from '@/lib/caps-tutor'
 
 type Listener = () => void
 
@@ -186,7 +191,9 @@ class LiveApi {
       aiMessages,
       whatsappOutbox,
     ] = await Promise.all([
-      sb.from('schools').select('*'),
+      sb.from('schools').select(
+        'id,name,emis_number,address,phone,email,logo_url,whatsapp_enabled,whatsapp_provider,whatsapp_from,whatsapp_account_sid,whatsapp_auth_token,whatsapp_notify_attendance,whatsapp_notify_announcements,whatsapp_notify_fees,ai_tutor_enabled,ai_tutor_model',
+      ),
       sb.from('profiles').select('*'),
       sb.from('grades').select('*'),
       sb.from('classes').select('*'),
@@ -250,6 +257,9 @@ class LiveApi {
           whatsappNotifyAttendance: schoolRow.whatsapp_notify_attendance ?? true,
           whatsappNotifyAnnouncements: schoolRow.whatsapp_notify_announcements ?? true,
           whatsappNotifyFees: schoolRow.whatsapp_notify_fees ?? true,
+          aiTutorEnabled: schoolRow.ai_tutor_enabled ?? true,
+          aiTutorModel: schoolRow.ai_tutor_model ?? 'gpt-4o',
+          // Never expose openai_api_key to the client cache
         }
       : this.school
 
@@ -564,6 +574,9 @@ class LiveApi {
       title: s.title,
       createdAt: s.created_at,
       updatedAt: s.updated_at,
+      gradeLevel: s.grade_level ?? undefined,
+      languageCode: s.language_code ?? undefined,
+      mode: s.mode ?? undefined,
     }))
     this.aiMessages = (aiMessages.data ?? []).map((m) => ({
       id: m.id,
@@ -571,6 +584,9 @@ class LiveApi {
       role: m.role,
       content: m.content,
       createdAt: m.created_at,
+      attachmentUrl: m.attachment_url ?? undefined,
+      attachmentType: m.attachment_type ?? undefined,
+      provider: m.provider ?? undefined,
     }))
     this.whatsappOutbox = (whatsappOutbox.data ?? []).map((w) => ({
       id: w.id,
@@ -1438,10 +1454,26 @@ class LiveApi {
     return this.aiMessages.filter((m) => m.sessionId === sessionId)
   }
 
-  async askAiTutor(input: { studentId: string; subjectId?: string; question: string; sessionId?: string }) {
+  async askAiTutor(input: {
+    studentId: string
+    subjectId?: string
+    question: string
+    sessionId?: string
+    gradeLevel?: string
+    languageCode?: string
+    mode?: TutorMode
+    imageDataUrl?: string
+    pdfText?: string
+    learnerName?: string
+    attachmentLabel?: string
+  }) {
     const sb = requireSupabase()
     let sessionId = input.sessionId
     const subject = input.subjectId ? this.getSubject(input.subjectId) : undefined
+    const titleBits = [
+      subject?.name || 'CAPS Tutor',
+      input.mode && input.mode !== 'chat' ? input.mode : null,
+    ].filter(Boolean)
     if (!sessionId) {
       const { data, error } = await sb
         .from('ai_tutor_sessions')
@@ -1449,27 +1481,152 @@ class LiveApi {
           school_id: this.school.id,
           student_id: input.studentId,
           subject_id: input.subjectId || null,
-          title: subject ? `${subject.name} tutoring` : 'CAPS study session',
+          title: titleBits.join(' · '),
+          grade_level: input.gradeLevel || null,
+          language_code: input.languageCode || 'en-ZA',
+          mode: input.mode || 'chat',
         })
         .select('*')
         .single()
       if (error) throw error
       sessionId = data.id
     }
+
+    const userContent = [
+      input.question,
+      input.attachmentLabel ? `\n[Attachment: ${input.attachmentLabel}]` : '',
+    ]
+      .join('')
+      .trim()
+
     await sb.from('ai_tutor_messages').insert({
       session_id: sessionId,
       role: 'user',
-      content: input.question,
+      content: userContent,
+      attachment_type: input.imageDataUrl ? 'image' : input.pdfText ? 'pdf' : null,
     })
-    const reply = await generateTutorReply(input.question, subject?.name)
+
+    if (!sessionId) throw new Error('Could not create tutor session')
+
+    const prior = this.listAiMessages(sessionId).map(
+      (m): TutorChatMessage => ({
+        role: m.role === 'system' ? 'system' : m.role,
+        content: m.content,
+      }),
+    )
+
+    const systemPrompt = buildCapsSystemPrompt({
+      subjectName: subject?.name,
+      gradeLevel: input.gradeLevel,
+      languageCode: input.languageCode,
+      mode: input.mode,
+      learnerName: input.learnerName,
+    })
+
+    let reply = ''
+    let provider: 'openai' | 'fallback' = 'fallback'
+
+    // Prefer secure edge function (school OpenAI key)
+    try {
+      const historyPayload = prior.slice(-20).map((h) => ({ role: h.role, content: h.content }))
+      const userMsg =
+        input.imageDataUrl
+          ? {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text:
+                    userContent +
+                    (input.pdfText ? `\n\nPDF extract:\n${input.pdfText.slice(0, 18000)}` : ''),
+                },
+                { type: 'image_url', image_url: { url: input.imageDataUrl, detail: 'high' } },
+              ],
+            }
+          : {
+              role: 'user',
+              content:
+                userContent + (input.pdfText ? `\n\nPDF extract:\n${input.pdfText.slice(0, 18000)}` : ''),
+            }
+
+      const { data, error } = await sb.functions.invoke('ai-tutor', {
+        body: {
+          systemPrompt,
+          messages: [...historyPayload, userMsg],
+        },
+      })
+      if (!error && data?.reply) {
+        reply = String(data.reply)
+        provider = 'openai'
+      } else if (data?.code === 'NO_KEY' || error) {
+        // fall through to client OpenAI / offline
+      }
+    } catch {
+      // edge not deployed — continue
+    }
+
+    if (!reply) {
+      const result = await generateTutorReply({
+        question: input.question,
+        subjectName: subject?.name,
+        gradeLevel: input.gradeLevel,
+        languageCode: input.languageCode,
+        mode: input.mode,
+        history: prior,
+        imageDataUrl: input.imageDataUrl,
+        pdfText: input.pdfText,
+        learnerName: input.learnerName,
+      })
+      reply = result.reply
+      provider = result.provider
+    }
+
     await sb.from('ai_tutor_messages').insert({
       session_id: sessionId,
       role: 'assistant',
       content: reply,
+      provider,
     })
-    await sb.from('ai_tutor_sessions').update({ updated_at: new Date().toISOString() }).eq('id', sessionId)
+    await sb
+      .from('ai_tutor_sessions')
+      .update({
+        updated_at: new Date().toISOString(),
+        language_code: input.languageCode || 'en-ZA',
+        mode: input.mode || 'chat',
+        grade_level: input.gradeLevel || null,
+        subject_id: input.subjectId || null,
+      })
+      .eq('id', sessionId)
     await this.refresh()
-    return { sessionId: sessionId!, reply }
+    return { sessionId: sessionId!, reply, provider }
+  }
+
+  async updateAiTutorSettings(patch: {
+    openaiApiKey?: string
+    aiTutorEnabled?: boolean
+    aiTutorModel?: string
+  }) {
+    const sb = requireSupabase()
+    const payload: Record<string, unknown> = {}
+    if (patch.openaiApiKey !== undefined) payload.openai_api_key = patch.openaiApiKey || null
+    if (patch.aiTutorEnabled !== undefined) payload.ai_tutor_enabled = patch.aiTutorEnabled
+    if (patch.aiTutorModel !== undefined) payload.ai_tutor_model = patch.aiTutorModel
+    const { error } = await sb.from('schools').update(payload).eq('id', this.school.id)
+    if (error) throw error
+    await this.refresh()
+  }
+
+  async isAiTutorLive(): Promise<boolean> {
+    if (import.meta.env.VITE_OPENAI_API_KEY) return true
+    try {
+      const sb = requireSupabase()
+      const { data } = await sb.functions.invoke('ai-tutor', {
+        body: { ping: true },
+      })
+      return Boolean(data?.reply) || data?.code !== 'NO_KEY'
+    } catch {
+      return false
+    }
   }
 
   // ---- WhatsApp ----

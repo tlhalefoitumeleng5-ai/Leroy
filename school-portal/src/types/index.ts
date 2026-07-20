@@ -51,6 +51,9 @@ export interface School {
   whatsappNotifyAttendance?: boolean
   whatsappNotifyAnnouncements?: boolean
   whatsappNotifyFees?: boolean
+  openaiApiKey?: string
+  aiTutorEnabled?: boolean
+  aiTutorModel?: string
 }
 
 export interface Grade {
@@ -147,6 +150,9 @@ export interface AiTutorSession {
   title: string
   createdAt: string
   updatedAt: string
+  gradeLevel?: string
+  languageCode?: string
+  mode?: string
 }
 
 export interface AiTutorMessage {
@@ -155,6 +161,9 @@ export interface AiTutorMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   createdAt: string
+  attachmentUrl?: string
+  attachmentType?: string
+  provider?: string
 }
 
 export interface WhatsAppOutboxItem {

@@ -99,7 +99,7 @@ function navForRole(role: UserRole): NavItem[] {
         { to: '/admin/timetable', label: 'Timetable', icon: icon(<Clock className="h-4 w-4" />) },
         { to: '/admin/admissions', label: 'Admissions', icon: icon(<ClipboardList className="h-4 w-4" />) },
         { to: '/admin/announcements', label: 'Announcements', icon: icon(<Megaphone className="h-4 w-4" />) },
-        { to: '/admin/whatsapp', label: 'WhatsApp', icon: icon(<Smartphone className="h-4 w-4" />) },
+        { to: '/admin/whatsapp', label: 'WhatsApp & AI', icon: icon(<Smartphone className="h-4 w-4" />) },
         { to: '/admin/messages', label: 'Messages', icon: icon(<MessageSquare className="h-4 w-4" />) },
         { to: '/admin/reports', label: 'Reports', icon: icon(<FileText className="h-4 w-4" />) },
         { to: '/admin/calendar', label: 'Calendar', icon: icon(<Calendar className="h-4 w-4" />) },

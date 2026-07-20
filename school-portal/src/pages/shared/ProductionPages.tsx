@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Bot,
   CreditCard,
   MessageSquare,
   Send,
@@ -481,122 +480,73 @@ export function StudentFeesPage() {
   )
 }
 
-export function StudentAiTutorPage() {
+export { StudentAiTutorPage } from '@/pages/student/AiTutorPage'
+
+export function AdminAiTutorSettings() {
   useApiRefresh()
-  const { user } = useAuth()
-  const [sessionId, setSessionId] = useState<string>('')
-  const [subjectId, setSubjectId] = useState('')
-  const [question, setQuestion] = useState('')
+  const school = api.getDb().school
+  const [enabled, setEnabled] = useState(school.aiTutorEnabled ?? true)
+  const [model, setModel] = useState(school.aiTutorModel ?? 'gpt-4o')
+  const [apiKey, setApiKey] = useState('')
   const [busy, setBusy] = useState(false)
 
-  if (!user) return null
-  const student = api.getStudentByProfile(user.id)
-  const sessions = student ? api.listAiSessions(student.id) : []
-  const activeId = sessionId || sessions[0]?.id
-  const messages = activeId ? api.listAiMessages(activeId) : []
-  const enrolled = api.listClassSubjects().filter((cs) => cs.classId === student?.classId)
-
   return (
-    <div className="space-y-4 animate-fade-in">
-      <PageHeader
-        title="AI Tutor"
-        description="CAPS-aligned study help for South African learners"
-        actions={
-          <Badge variant="secondary" className="gap-1">
-            <Sparkles className="h-3 w-3" /> CAPS
-          </Badge>
-        }
-      />
-      <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Sessions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {sessions.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${activeId === s.id ? 'border-primary bg-primary/5' : 'border-border'}`}
-                onClick={() => setSessionId(s.id)}
-              >
-                {s.title}
-              </button>
-            ))}
-            {sessions.length === 0 ? <p className="text-xs text-muted-foreground">Ask a question to start.</p> : null}
-          </CardContent>
-        </Card>
-        <Card className="min-h-[420px] flex flex-col">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Bot className="h-4 w-4 text-primary" /> Study chat
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col gap-3">
-            <div className="flex-1 space-y-3 overflow-y-auto max-h-[45vh] rounded-xl bg-muted/30 p-3">
-              {messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${
-                    m.role === 'user' ? 'ml-8 bg-primary text-primary-foreground' : 'mr-8 bg-card border border-border'
-                  }`}
-                >
-                  {m.content}
-                </div>
-              ))}
-              {messages.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Ask about Mathematics, English, Life Sciences, History, or exam technique. Answers follow CAPS methods.
-                </p>
-              ) : null}
-            </div>
-            <Select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
-              <option value="">Subject (optional)</option>
-              {enrolled.map((cs) => {
-                const sub = api.getSubject(cs.subjectId)
-                return (
-                  <option key={cs.id} value={cs.subjectId}>
-                    {sub?.name}
-                  </option>
-                )
-              })}
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Sparkles className="h-4 w-4 text-primary" /> AI Tutor (GPT-4o)
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form
+          className="grid gap-3 sm:grid-cols-2"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            setBusy(true)
+            try {
+              await api.updateAiTutorSettings({
+                aiTutorEnabled: enabled,
+                aiTutorModel: model,
+                openaiApiKey: apiKey || undefined,
+              })
+              setApiKey('')
+              toast.success('AI Tutor settings saved')
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : 'Save failed')
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+            Enable AI Tutor for students
+          </label>
+          <div className="space-y-2">
+            <Label>Model</Label>
+            <Select value={model} onChange={(e) => setModel(e.target.value)}>
+              <option value="gpt-4o">gpt-4o (recommended · vision)</option>
+              <option value="gpt-4o-mini">gpt-4o-mini (faster · cheaper)</option>
             </Select>
-            <form
-              className="flex gap-2"
-              onSubmit={async (e) => {
-                e.preventDefault()
-                if (!student || !question.trim()) return
-                setBusy(true)
-                try {
-                  const res = await api.askAiTutor({
-                    studentId: student.id,
-                    subjectId: subjectId || undefined,
-                    question: question.trim(),
-                    sessionId: activeId || undefined,
-                  })
-                  setSessionId(res.sessionId)
-                  setQuestion('')
-                } catch (err) {
-                  toast.error(err instanceof Error ? err.message : 'Tutor unavailable')
-                } finally {
-                  setBusy(false)
-                }
-              }}
-            >
-              <Input
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Ask your CAPS tutor…"
-                className="flex-1"
-              />
-              <Button type="submit" disabled={busy}>
-                {busy ? 'Thinking…' : 'Ask'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label>OpenAI API key (stored securely for the school)</Label>
+            <Input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk-… leave blank to keep existing"
+              autoComplete="off"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground sm:col-span-2">
+            Deploy the <code>ai-tutor</code> Edge Function so students never see this key. Until then, set{' '}
+            <code>VITE_OPENAI_API_KEY</code> for single-tenant GPT-4o. Without a key, learners still get CAPS study help.
+          </p>
+          <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save AI settings'}</Button>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -625,13 +575,14 @@ export function AdminWhatsAppPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title="WhatsApp Notifications"
-        description="Queue parent alerts via Twilio WhatsApp Business"
+        title="WhatsApp & AI"
+        description="Parent WhatsApp alerts and school AI Tutor configuration"
       />
+      <AdminAiTutorSettings />
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Smartphone className="h-4 w-4 text-primary" /> Provider settings
+            <Smartphone className="h-4 w-4 text-primary" /> WhatsApp provider settings
           </CardTitle>
         </CardHeader>
         <CardContent>
