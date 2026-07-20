@@ -88,6 +88,7 @@ export function StudentAiTutorPage() {
   const [providerHint, setProviderHint] = useState<'openai' | 'fallback' | null>(null)
   const [streamingText, setStreamingText] = useState('')
   const [modelUsed, setModelUsed] = useState<string | undefined>()
+  const [hasOpenaiKey, setHasOpenaiKey] = useState<boolean | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
@@ -99,6 +100,10 @@ export function StudentAiTutorPage() {
   const audioChunksRef = useRef<Blob[]>([])
 
   useEffect(() => () => stopSpeaking(), [])
+
+  useEffect(() => {
+    void api.getAiAssistantStatus().then((s) => setHasOpenaiKey(s.hasKey))
+  }, [])
 
   const student = user ? api.getStudentByProfile(user.id) : undefined
   const gradeFromStudent = student?.gradeId ? api.getGrade(student.gradeId)?.gradeNumber : undefined
@@ -340,6 +345,9 @@ export function StudentAiTutorPage() {
               <Badge variant="success">{modelUsed || 'GPT-5.5'} live</Badge>
             ) : null}
             {providerHint === 'fallback' ? <Badge variant="warning">Study mode</Badge> : null}
+            {hasOpenaiKey === false && providerHint !== 'openai' ? (
+              <Badge variant="warning">Ask admin for OpenAI key</Badge>
+            ) : null}
           </div>
         }
       />
@@ -738,6 +746,7 @@ export function StudentAiTutorPage() {
                 placeholder="Message AI Assistant…"
                 className="min-h-11 max-h-36 flex-1 resize-y rounded-2xl border-border bg-muted/30 px-3 py-2.5"
                 rows={1}
+                enterKeyHint="send"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()

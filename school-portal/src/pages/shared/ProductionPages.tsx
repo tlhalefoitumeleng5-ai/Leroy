@@ -489,6 +489,11 @@ export function AdminAiTutorSettings() {
   const [model, setModel] = useState(school.aiTutorModel ?? 'gpt-5.5')
   const [apiKey, setApiKey] = useState('')
   const [busy, setBusy] = useState(false)
+  const [hasKey, setHasKey] = useState(false)
+
+  useEffect(() => {
+    void api.getAiAssistantStatus().then((s) => setHasKey(s.hasKey))
+  }, [school.id, school.aiTutorModel, school.aiTutorEnabled])
 
   return (
     <Card>
@@ -510,7 +515,13 @@ export function AdminAiTutorSettings() {
                 openaiApiKey: apiKey || undefined,
               })
               setApiKey('')
-              toast.success('AI Assistant settings saved')
+              const status = await api.getAiAssistantStatus()
+              setHasKey(status.hasKey)
+              toast.success(
+                status.hasKey
+                  ? 'OpenAI key saved — GPT replies are enabled'
+                  : 'AI Assistant settings saved',
+              )
             } catch (err) {
               toast.error(err instanceof Error ? err.message : 'Save failed')
             } finally {
@@ -532,22 +543,31 @@ export function AdminAiTutorSettings() {
               <option value="gpt-4o-mini">gpt-4o-mini (faster)</option>
             </Select>
           </div>
+          <div className="flex items-end">
+            {hasKey ? (
+              <Badge variant="success">OpenAI key configured · GPT replies on</Badge>
+            ) : (
+              <Badge variant="warning">OpenAI key missing · study mode only</Badge>
+            )}
+          </div>
           <div className="space-y-2 sm:col-span-2">
-            <Label>OpenAI API key (stored securely for the school)</Label>
+            <Label>OpenAI API key (required for GPT replies)</Label>
             <Input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-… leave blank to keep existing"
+              placeholder={hasKey ? '••••••••  leave blank to keep existing key' : 'sk-… paste OpenAI key to unlock GPT replies'}
               autoComplete="off"
             />
           </div>
           <p className="text-xs text-muted-foreground sm:col-span-2">
-            Deploy the <code>ai-tutor</code> Edge Function so students never see this key. Streaming uses GPT-5.5
-            (or your selected model) via the live backend. Until deployed, set <code>VITE_OPENAI_API_KEY</code> for
-            single-tenant GPT. Without a key, learners still get CAPS study help offline.
+            Paste your OpenAI API key here to unlock live GPT-5.5 replies for students. The key is stored on the school
+            record and used server-side only (never shown to learners). You can also deploy the <code>ai-tutor</code>{' '}
+            Edge Function later for native SSE streaming.
           </p>
-          <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save AI settings'}</Button>
+          <Button type="submit" disabled={busy}>
+            {busy ? 'Saving…' : hasKey && !apiKey ? 'Save AI settings' : 'Save OpenAI key & enable replies'}
+          </Button>
         </form>
       </CardContent>
     </Card>

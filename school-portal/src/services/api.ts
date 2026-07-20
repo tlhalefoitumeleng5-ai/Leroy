@@ -49,6 +49,20 @@ import {
 } from '@/lib/caps-tutor'
 import { supabaseAnonKey, supabaseUrl } from '@/lib/supabase'
 
+/** Reveal text in short chunks so UI still feels live when using the DB OpenAI proxy. */
+async function revealTextProgressively(text: string, onDelta: (full: string) => void) {
+  const parts = text.split(/(\s+)/)
+  let full = ''
+  for (let i = 0; i < parts.length; i++) {
+    full += parts[i]
+    if (i % 3 === 0 || i === parts.length - 1) {
+      onDelta(full)
+      await new Promise((r) => setTimeout(r, 12))
+    }
+  }
+  onDelta(text)
+}
+
 type Listener = () => void
 
 function mapProfile(row: Record<string, unknown>): Profile {
@@ -1563,10 +1577,40 @@ class LiveApi {
         reply = String(data.reply)
         provider = 'openai'
       } else if (data?.code === 'NO_KEY' || error) {
-        // fall through to client OpenAI / offline
+        // fall through
       }
     } catch {
       // edge not deployed — continue
+    }
+
+    // School OpenAI key via secure DB proxy
+    if (!reply) {
+      try {
+        const historyPayload = prior.slice(-20).map((h) => ({ role: h.role, content: h.content }))
+        const docBlock = docText ? `\n\nUploaded document text:\n${docText.slice(0, 18000)}` : ''
+        const userMsg =
+          input.imageDataUrl
+            ? {
+                role: 'user',
+                content: [
+                  { type: 'text', text: userContent + docBlock },
+                  { type: 'image_url', image_url: { url: input.imageDataUrl, detail: 'high' } },
+                ],
+              }
+            : { role: 'user', content: userContent + docBlock }
+        const { data, error } = await sb.rpc('ai_assistant_complete', {
+          p_system_prompt: systemPrompt,
+          p_messages: [...historyPayload, userMsg],
+          p_model: this.school.aiTutorModel || preferredTutorModel(),
+        })
+        const payload = data as { ok?: boolean; reply?: string } | null
+        if (!error && payload?.ok && payload.reply) {
+          reply = String(payload.reply)
+          provider = 'openai'
+        }
+      } catch {
+        // continue
+      }
     }
 
     if (!reply) {
@@ -1735,7 +1779,32 @@ class LiveApi {
       // edge not deployed / network — continue
     }
 
-    // 2) Client streaming (VITE_OPENAI_API_KEY) or offline CAPS fallback
+    // 2) School OpenAI key via secure DB proxy (no Edge Function required)
+    if (!reply) {
+      try {
+        const { data, error } = await sb.rpc('ai_assistant_complete', {
+          p_system_prompt: systemPrompt,
+          p_messages: [...historyPayload, userMsg],
+          p_model: this.school.aiTutorModel || preferredTutorModel(),
+        })
+        const payload = data as {
+          ok?: boolean
+          reply?: string
+          model?: string
+          code?: string
+        } | null
+        if (!error && payload?.ok && payload.reply) {
+          reply = String(payload.reply)
+          provider = 'openai'
+          model = payload.model || preferredTutorModel(this.school.aiTutorModel)
+          await revealTextProgressively(reply, onDelta)
+        }
+      } catch {
+        // RPC unavailable — continue
+      }
+    }
+
+    // 3) Client streaming (VITE_OPENAI_API_KEY) or offline CAPS fallback
     if (!reply) {
       const result = await streamTutorReply(
         {
@@ -1792,8 +1861,40 @@ class LiveApi {
     await this.refresh()
   }
 
+  /** Whether the school OpenAI key is set (never returns the key itself). */
+  async getAiAssistantStatus(): Promise<{
+    ok: boolean
+    enabled: boolean
+    model: string
+    hasKey: boolean
+  }> {
+    const sb = requireSupabase()
+    try {
+      const { data, error } = await sb.rpc('ai_assistant_status')
+      if (!error && data && typeof data === 'object') {
+        const d = data as { ok?: boolean; enabled?: boolean; model?: string; hasKey?: boolean }
+        return {
+          ok: Boolean(d.ok),
+          enabled: d.enabled !== false,
+          model: d.model || this.school.aiTutorModel || preferredTutorModel(),
+          hasKey: Boolean(d.hasKey) || Boolean(import.meta.env.VITE_OPENAI_API_KEY),
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return {
+      ok: true,
+      enabled: this.school.aiTutorEnabled !== false,
+      model: this.school.aiTutorModel || preferredTutorModel(),
+      hasKey: Boolean(import.meta.env.VITE_OPENAI_API_KEY),
+    }
+  }
+
   async isAiTutorLive(): Promise<boolean> {
     if (import.meta.env.VITE_OPENAI_API_KEY) return true
+    const status = await this.getAiAssistantStatus()
+    if (status.hasKey && status.enabled) return true
     try {
       const sb = requireSupabase()
       const { data } = await sb.functions.invoke('ai-tutor', {
