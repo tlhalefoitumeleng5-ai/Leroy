@@ -2,10 +2,12 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { ProtectedRoute, homeForRole } from '@/components/layout/ProtectedRoute'
 import { useAuth } from '@/contexts/auth-context'
+import { hasSupabaseConfig } from '@/lib/supabase'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { ForgotPasswordPage, VerifyEmailPage } from '@/pages/auth/ForgotPasswordPage'
 import { AccountPage } from '@/pages/auth/AccountPage'
 import { AdmissionApplicationPage } from '@/pages/public/AdmissionApplicationPage'
+import { SupabaseSetupPage } from '@/pages/public/SupabaseSetupPage'
 import {
   StudentAnnouncementsPage,
   StudentAttendancePage,
@@ -73,6 +75,10 @@ function HomeRedirect() {
 }
 
 export default function App() {
+  if (!hasSupabaseConfig) {
+    return <SupabaseSetupPage />
+  }
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

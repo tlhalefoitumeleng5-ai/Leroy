@@ -35,8 +35,9 @@ export function AccountPage() {
             className="grid gap-4 sm:grid-cols-2"
             onSubmit={(e) => {
               e.preventDefault()
-              updateProfile({ firstName, lastName, phone, address })
-              toast.success('Profile updated')
+              void updateProfile({ firstName, lastName, phone, address }).then(() =>
+                toast.success('Profile updated'),
+              )
             }}
           >
             <div className="space-y-2">
@@ -147,9 +148,14 @@ export function AccountPage() {
         </CardContent>
       </Card>
 
-      <Button variant="destructive" onClick={logout}>
-        Sign out
-      </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                void logout()
+              }}
+            >
+              Sign out
+            </Button>
     </div>
   )
 }

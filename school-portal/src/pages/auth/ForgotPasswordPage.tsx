@@ -2,48 +2,24 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/auth-context'
-// toast used for verify + reset feedback
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { api } from '@/services/api'
 
 export function ForgotPasswordPage() {
   const { requestPasswordReset } = useAuth()
   const [email, setEmail] = useState('')
-  const [token, setToken] = useState<string | null>(null)
-  const [newPassword, setNewPassword] = useState('')
-  const [step, setStep] = useState<'request' | 'reset'>('request')
+  const [sent, setSent] = useState(false)
 
   async function request(e: React.FormEvent) {
     e.preventDefault()
     try {
-      const t = await requestPasswordReset(email)
-      setToken(t)
-      setStep('reset')
-      toast.success('Reset code generated (demo email simulation)')
+      await requestPasswordReset(email)
+      setSent(true)
+      toast.success('Password reset email sent (check inbox / Supabase Auth logs)')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed')
     }
-  }
-
-  function reset(e: React.FormEvent) {
-    e.preventDefault()
-    const saved = localStorage.getItem(`reset_${email}`)
-    if (!token || saved !== token) {
-      toast.error('Invalid reset code')
-      return
-    }
-    if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters')
-      return
-    }
-    api.setPassword(email, newPassword)
-    localStorage.removeItem(`reset_${email}`)
-    toast.success('Password updated. You can sign in now.')
-    setStep('request')
-    setToken(null)
-    setNewPassword('')
   }
 
   return (
@@ -51,37 +27,21 @@ export function ForgotPasswordPage() {
       <Card className="w-full max-w-md animate-slide-up">
         <CardHeader>
           <CardTitle>Forgot password</CardTitle>
-          <CardDescription>We will issue a secure reset code to your email</CardDescription>
+          <CardDescription>Supabase Auth will email a secure reset link</CardDescription>
         </CardHeader>
         <CardContent>
-          {step === 'request' ? (
+          {sent ? (
+            <p className="text-sm text-emerald-600">
+              If an account exists for {email}, a reset link has been sent.
+            </p>
+          ) : (
             <form className="space-y-4" onSubmit={request}>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <Button type="submit" className="w-full">
-                Send reset code
-              </Button>
-            </form>
-          ) : (
-            <form className="space-y-4" onSubmit={reset}>
-              <div className="rounded-lg bg-muted p-3 text-sm">
-                Demo reset code: <span className="font-mono font-bold">{token}</span>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="np">New password</Label>
-                <Input
-                  id="np"
-                  type="password"
-                  required
-                  minLength={8}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                Update password
+                Send reset email
               </Button>
             </form>
           )}
@@ -116,9 +76,10 @@ export function VerifyEmailPage() {
                 <Button
                   className="w-full"
                   onClick={() => {
-                    verifyEmail()
-                    setDone(true)
-                    toast.success('Email verified')
+                    void verifyEmail().then(() => {
+                      setDone(true)
+                      toast.success('Email verified')
+                    })
                   }}
                 >
                   Verify my email

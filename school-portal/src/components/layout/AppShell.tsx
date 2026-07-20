@@ -171,8 +171,7 @@ export function AppShell() {
               variant="outline"
               className="w-full justify-start"
               onClick={() => {
-                logout()
-                navigate('/login')
+                void logout().then(() => navigate('/login'))
               }}
             >
               <LogOut className="h-4 w-4" />

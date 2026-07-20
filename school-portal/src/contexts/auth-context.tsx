@@ -8,116 +8,175 @@ import {
   type ReactNode,
 } from 'react'
 import type { AuthUser, Profile, UserRole } from '@/types'
-import { api } from '@/services/api'
-import { isDemoMode } from '@/lib/supabase'
-
-const SESSION_KEY = 'school_portal_session'
-const REMEMBER_KEY = 'school_portal_remember'
+import { hasSupabaseConfig, requireSupabase } from '@/lib/supabase'
 
 interface AuthContextValue {
   user: AuthUser | null
   loading: boolean
   isDemoMode: boolean
   login: (email: string, password: string, remember?: boolean) => Promise<void>
-  logout: () => void
-  updateProfile: (patch: Partial<Profile>) => void
+  logout: () => Promise<void>
+  updateProfile: (patch: Partial<Profile>) => Promise<void>
   changePassword: (current: string, next: string) => Promise<void>
   requestPasswordReset: (email: string) => Promise<string>
-  verifyEmail: () => void
+  verifyEmail: () => Promise<void>
   hasRole: (...roles: UserRole[]) => boolean
-  refresh: () => void
+  refresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-function loadSession(): AuthUser | null {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as AuthUser
-    const profile = api.getProfile(parsed.id)
-    if (!profile || !profile.isActive) return null
-    return { id: profile.id, email: profile.email, profile }
-  } catch {
-    return null
+function mapProfile(row: Record<string, unknown>): Profile {
+  return {
+    id: String(row.id),
+    schoolId: String(row.school_id ?? ''),
+    role: row.role as UserRole,
+    firstName: String(row.first_name ?? ''),
+    lastName: String(row.last_name ?? ''),
+    email: String(row.email ?? ''),
+    phone: row.phone ? String(row.phone) : undefined,
+    avatarUrl: row.avatar_url ? String(row.avatar_url) : undefined,
+    dateOfBirth: row.date_of_birth ? String(row.date_of_birth) : undefined,
+    gender: row.gender as Profile['gender'],
+    address: row.address ? String(row.address) : undefined,
+    isActive: Boolean(row.is_active ?? true),
+    emailVerified: Boolean(row.email_verified ?? false),
+    createdAt: String(row.created_at ?? new Date().toISOString()),
   }
 }
 
-function persistSession(user: AuthUser | null, remember: boolean) {
-  localStorage.removeItem(SESSION_KEY)
-  sessionStorage.removeItem(SESSION_KEY)
-  if (!user) return
-  const raw = JSON.stringify(user)
-  if (remember) localStorage.setItem(SESSION_KEY, raw)
-  else sessionStorage.setItem(SESSION_KEY, raw)
-  localStorage.setItem(REMEMBER_KEY, remember ? '1' : '0')
+async function fetchProfile(userId: string): Promise<Profile | null> {
+  const sb = requireSupabase()
+  const { data, error } = await sb.from('profiles').select('*').eq('id', userId).maybeSingle()
+  if (error) throw error
+  return data ? mapProfile(data) : null
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
-  const [, setTick] = useState(0)
+
+  const refresh = useCallback(async () => {
+    if (!hasSupabaseConfig) {
+      setUser(null)
+      setLoading(false)
+      return
+    }
+    const sb = requireSupabase()
+    const { data } = await sb.auth.getSession()
+    const sessionUser = data.session?.user
+    if (!sessionUser) {
+      setUser(null)
+      setLoading(false)
+      return
+    }
+    const profile = await fetchProfile(sessionUser.id)
+    if (!profile || !profile.isActive) {
+      setUser(null)
+      setLoading(false)
+      return
+    }
+    setUser({ id: sessionUser.id, email: sessionUser.email ?? profile.email, profile })
+    setLoading(false)
+  }, [])
 
   useEffect(() => {
-    setUser(loadSession())
-    setLoading(false)
-    return api.subscribe(() => setTick((t) => t + 1))
-  }, [])
+    void refresh()
+    if (!hasSupabaseConfig) return
+    const sb = requireSupabase()
+    const { data: sub } = sb.auth.onAuthStateChange(() => {
+      void refresh()
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [refresh])
 
-  const login = useCallback(async (email: string, password: string, remember = true) => {
-    const profile = api.findProfileByEmail(email.trim())
-    if (!profile) throw new Error('No account found with that email.')
-    if (!api.verifyPassword(profile.email, password)) throw new Error('Incorrect password.')
+  const login = useCallback(async (email: string, password: string, _remember = true) => {
+    const sb = requireSupabase()
+    const { data, error } = await sb.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    })
+    if (error) throw new Error(error.message)
+    if (!data.user) throw new Error('Login failed')
+    const profile = await fetchProfile(data.user.id)
+    if (!profile) throw new Error('Profile missing. Run npm run db:seed')
     if (!profile.isActive) throw new Error('This account has been deactivated.')
-    const authUser: AuthUser = { id: profile.id, email: profile.email, profile }
-    persistSession(authUser, remember)
-    api.addAudit(profile.id, 'LOGIN', 'session')
-    setUser(authUser)
+    await sb.from('audit_logs').insert({
+      school_id: profile.schoolId || null,
+      actor_id: profile.id,
+      action: 'LOGIN',
+      entity_type: 'session',
+    })
+    setUser({ id: data.user.id, email: data.user.email ?? profile.email, profile })
   }, [])
 
-  const logout = useCallback(() => {
-    if (user) api.addAudit(user.id, 'LOGOUT', 'session')
-    persistSession(null, false)
+  const logout = useCallback(async () => {
+    if (hasSupabaseConfig) {
+      const sb = requireSupabase()
+      if (user) {
+        await sb.from('audit_logs').insert({
+          school_id: user.profile.schoolId || null,
+          actor_id: user.id,
+          action: 'LOGOUT',
+          entity_type: 'session',
+        })
+      }
+      await sb.auth.signOut()
+    }
     setUser(null)
   }, [user])
 
   const updateProfile = useCallback(
-    (patch: Partial<Profile>) => {
+    async (patch: Partial<Profile>) => {
       if (!user) return
-      const updated = api.updateProfile(user.id, patch)
-      if (updated) {
-        const next = { ...user, email: updated.email, profile: updated }
-        const remember = localStorage.getItem(REMEMBER_KEY) === '1'
-        persistSession(next, remember)
-        setUser(next)
-      }
+      const sb = requireSupabase()
+      const payload: Record<string, unknown> = {}
+      if (patch.firstName !== undefined) payload.first_name = patch.firstName
+      if (patch.lastName !== undefined) payload.last_name = patch.lastName
+      if (patch.phone !== undefined) payload.phone = patch.phone
+      if (patch.address !== undefined) payload.address = patch.address
+      if (patch.avatarUrl !== undefined) payload.avatar_url = patch.avatarUrl
+      if (patch.emailVerified !== undefined) payload.email_verified = patch.emailVerified
+      const { data, error } = await sb.from('profiles').update(payload).eq('id', user.id).select('*').single()
+      if (error) throw error
+      const profile = mapProfile(data)
+      setUser({ id: user.id, email: profile.email, profile })
     },
     [user],
   )
 
-  const changePassword = useCallback(
-    async (current: string, next: string) => {
-      if (!user) throw new Error('Not authenticated')
-      if (!api.verifyPassword(user.email, current)) throw new Error('Current password is incorrect.')
-      if (next.length < 8) throw new Error('Password must be at least 8 characters.')
-      api.setPassword(user.email, next)
-      api.addAudit(user.id, 'CHANGE_PASSWORD', 'profile', user.id)
-    },
-    [user],
-  )
+  const changePassword = useCallback(async (current: string, next: string) => {
+    if (!user) throw new Error('Not authenticated')
+    if (next.length < 8) throw new Error('Password must be at least 8 characters.')
+    const sb = requireSupabase()
+    const { error: reauthError } = await sb.auth.signInWithPassword({
+      email: user.email,
+      password: current,
+    })
+    if (reauthError) throw new Error('Current password is incorrect.')
+    const { error } = await sb.auth.updateUser({ password: next })
+    if (error) throw new Error(error.message)
+    await sb.from('audit_logs').insert({
+      school_id: user.profile.schoolId || null,
+      actor_id: user.id,
+      action: 'CHANGE_PASSWORD',
+      entity_type: 'profile',
+      entity_id: user.id,
+    })
+  }, [user])
 
   const requestPasswordReset = useCallback(async (email: string) => {
-    const profile = api.findProfileByEmail(email.trim())
-    if (!profile) throw new Error('No account found with that email.')
-    const token = crypto.randomUUID().slice(0, 8).toUpperCase()
-    localStorage.setItem(`reset_${profile.email}`, token)
-    // Demo: password reset token shown to user (email simulation)
-    return token
+    const sb = requireSupabase()
+    const { error } = await sb.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/login`,
+    })
+    if (error) throw new Error(error.message)
+    return 'EMAIL_SENT'
   }, [])
 
-  const verifyEmail = useCallback(() => {
+  const verifyEmail = useCallback(async () => {
     if (!user) return
-    updateProfile({ emailVerified: true })
+    await updateProfile({ emailVerified: true })
   }, [user, updateProfile])
 
   const hasRole = useCallback(
@@ -125,16 +184,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   )
 
-  const refresh = useCallback(() => {
-    setUser(loadSession())
-    setTick((t) => t + 1)
-  }, [])
-
   const value = useMemo(
     () => ({
       user,
       loading,
-      isDemoMode,
+      isDemoMode: false,
       login,
       logout,
       updateProfile,
