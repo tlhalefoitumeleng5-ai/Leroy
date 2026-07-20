@@ -151,6 +151,8 @@ export function buildCapsSystemPrompt(opts: {
     '- For Mathematics and Physical Sciences: ALWAYS show clear step-by-step working.',
     '- Help with homework, assignments, projects, exam prep, quizzes, flashcards, summaries, and study plans.',
     '- Prefer teaching understanding over dumping final answers; still provide complete worked solutions when asked.',
+    '- When an image is attached: carefully read printed AND handwritten notes, diagrams, and equations.',
+    '- When a document (PDF, Word, Excel, PowerPoint, text) is attached: use its content to answer accurately.',
     '',
     'INTEGRITY (critical):',
     '- NEVER invent facts, formulas, historical dates, or syllabus claims.',
