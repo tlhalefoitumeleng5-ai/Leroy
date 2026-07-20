@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Accidental React Native stubs — this repo is Flutter (see pubspec.yaml)
+/package.json
+/package-lock.json
+/node_modules/
