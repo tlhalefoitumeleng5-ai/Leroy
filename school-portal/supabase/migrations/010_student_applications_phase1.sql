@@ -15,11 +15,11 @@ ALTER TABLE student_applications
   ADD COLUMN IF NOT EXISTS parent_residential_address TEXT;
 
 UPDATE student_applications
-SET storage_token = encode(gen_random_bytes(24), 'hex')
+SET storage_token = encode(extensions.gen_random_bytes(24), 'hex')
 WHERE storage_token IS NULL OR length(storage_token) < 32;
 
 ALTER TABLE student_applications
-  ALTER COLUMN storage_token SET DEFAULT encode(gen_random_bytes(24), 'hex');
+  ALTER COLUMN storage_token SET DEFAULT encode(extensions.gen_random_bytes(24), 'hex');
 ALTER TABLE student_applications
   ALTER COLUMN storage_token SET NOT NULL;
 ALTER TABLE student_applications
@@ -357,7 +357,7 @@ RETURNS TEXT
 LANGUAGE sql
 SET search_path = public
 AS $$
-  SELECT upper(substr(encode(gen_random_bytes(8), 'hex'), 1, 12));
+  SELECT upper(substr(encode(extensions.gen_random_bytes(8), 'hex'), 1, 12));
 $$;
 
 REVOKE ALL ON FUNCTION public.generate_access_code() FROM PUBLIC;
