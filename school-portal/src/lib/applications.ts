@@ -1,4 +1,4 @@
-import type { ApplicationDocType, StudentApplicationStatus } from '@/types'
+import type { ApplicationDocType, StudentApplicationStatus, StudentApplicationType } from '@/types'
 import { SA_OFFICIAL_LANGUAGES } from '@/lib/caps-tutor'
 
 export const APPLICATION_DOC_TYPES: Array<{
@@ -21,6 +21,7 @@ export const APPLICATION_DOC_TYPES: Array<{
 
 export const APPLICATION_STATUSES: Array<{ id: StudentApplicationStatus; label: string }> = [
   { id: 'draft', label: 'Draft' },
+  { id: 'submitted', label: 'Submitted' },
   { id: 'pending', label: 'Pending' },
   { id: 'under_review', label: 'Under Review' },
   { id: 'approved', label: 'Approved' },
@@ -258,6 +259,128 @@ export function uiText(locale: string, key: string) {
 
 export function statusLabel(status: StudentApplicationStatus) {
   return APPLICATION_STATUSES.find((s) => s.id === status)?.label || status
+}
+
+export const MAX_APPLICATION_FILE_BYTES = 15 * 1024 * 1024
+
+const ALLOWED_APPLICATION_FILE_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'])
+const ALLOWED_APPLICATION_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
+])
+
+const FILE_SIGNATURES = {
+  pdf: [0x25, 0x50, 0x44, 0x46, 0x2d],
+  doc: [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1],
+  docx: [0x50, 0x4b, 0x03, 0x04],
+  jpg: [0xff, 0xd8, 0xff],
+  png: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+} as const
+
+const WORD_DOCUMENT_STREAM = new Uint8Array(
+  Array.from('WordDocument\0').flatMap((character) => [character.charCodeAt(0), 0]),
+)
+
+function startsWithSignature(bytes: Uint8Array, signature: readonly number[]) {
+  return bytes.length >= signature.length && signature.every((byte, index) => bytes[index] === byte)
+}
+
+function includesSignature(bytes: Uint8Array, signature: Uint8Array) {
+  outer: for (let index = 0; index <= bytes.length - signature.length; index += 1) {
+    for (let offset = 0; offset < signature.length; offset += 1) {
+      if (bytes[index + offset] !== signature[offset]) continue outer
+    }
+    return true
+  }
+  return false
+}
+
+async function hasApplicationFileSignature(file: File, extension: string) {
+  if (extension === 'doc' || extension === 'docx') {
+    const buffer = await file.arrayBuffer()
+    const bytes = new Uint8Array(buffer)
+
+    if (extension === 'doc') {
+      return (
+        startsWithSignature(bytes, FILE_SIGNATURES.doc) &&
+        includesSignature(bytes, WORD_DOCUMENT_STREAM)
+      )
+    }
+
+    if (!startsWithSignature(bytes, FILE_SIGNATURES.docx)) return false
+    const { default: JSZip } = await import('jszip')
+    const archive = await JSZip.loadAsync(buffer)
+    const contentTypes = archive.file('[Content_Types].xml')
+    if (!contentTypes || !archive.file('word/document.xml')) return false
+    const contentTypesXml = await contentTypes.async('string')
+    return contentTypesXml.includes(
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',
+    )
+  }
+
+  const signature = extension === 'jpeg' ? FILE_SIGNATURES.jpg : FILE_SIGNATURES[extension as 'pdf' | 'jpg' | 'png']
+  if (!signature) return false
+  const bytes = new Uint8Array(await file.slice(0, signature.length).arrayBuffer())
+  return startsWithSignature(bytes, signature)
+}
+
+export async function validateApplicationFile(file: File): Promise<string | null> {
+  const extension = file.name.split('.').pop()?.toLowerCase() || ''
+  const supportedType =
+    ALLOWED_APPLICATION_FILE_EXTENSIONS.has(extension) &&
+    (!file.type || ALLOWED_APPLICATION_MIME_TYPES.has(file.type))
+
+  if (!supportedType) {
+    return `${file.name} is not supported. Upload PDF, DOC, DOCX, JPG, or PNG files.`
+  }
+  if (file.size <= 0) return `${file.name} is empty.`
+  if (file.size > MAX_APPLICATION_FILE_BYTES) {
+    return `${file.name} is larger than the 15 MB limit.`
+  }
+
+  let signatureMatches = false
+  try {
+    signatureMatches = await hasApplicationFileSignature(file, extension)
+  } catch {
+    signatureMatches = false
+  }
+  return signatureMatches
+    ? null
+    : `${file.name} does not contain valid ${extension.toUpperCase()} file content.`
+}
+
+export function formatApplicationFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export interface SavedApplicationDraftSummary {
+  applicationType: StudentApplicationType
+  applicationNumber?: string
+  learnerName?: string
+}
+
+export function readSavedApplicationDraftSummary(): SavedApplicationDraftSummary | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
+    if (!raw) return null
+    const saved = JSON.parse(raw) as {
+      form?: { applicationType?: StudentApplicationType; firstName?: string; surname?: string }
+      meta?: { applicationNumber?: string }
+    }
+    if (!saved.form?.applicationType) return null
+    return {
+      applicationType: saved.form.applicationType,
+      applicationNumber: saved.meta?.applicationNumber,
+      learnerName: [saved.form.firstName, saved.form.surname].filter(Boolean).join(' ') || undefined,
+    }
+  } catch {
+    return null
+  }
 }
 
 /** Rough blur detection for photos (variance of greyscale luminance). */

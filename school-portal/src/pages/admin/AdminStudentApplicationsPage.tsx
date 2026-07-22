@@ -9,10 +9,10 @@ import {
   Search,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { jsPDF } from 'jspdf'
 import { useAuth } from '@/contexts/auth-context'
 import { applicationsApi } from '@/services/applications-api'
 import { APPLICATION_DOC_TYPES, statusLabel } from '@/lib/applications'
+import { downloadApplicationPdf } from '@/lib/applications-pdf'
 import {
   Badge,
   Card,
@@ -34,6 +34,7 @@ import type {
 
 const FILTERS: Array<StudentApplicationStatus | 'all'> = [
   'all',
+  'submitted',
   'pending',
   'under_review',
   'waiting_for_documents',
@@ -158,32 +159,7 @@ export function AdminStudentApplicationsPage() {
   }
 
   function exportPdf(app: StudentApplication) {
-    const doc = new jsPDF()
-    let y = 14
-    const line = (text: string, size = 11) => {
-      doc.setFontSize(size)
-      const lines = doc.splitTextToSize(text, 180)
-      doc.text(lines, 14, y)
-      y += lines.length * (size * 0.45) + 4
-      if (y > 280) {
-        doc.addPage()
-        y = 14
-      }
-    }
-    line('Student Application', 16)
-    line(`${app.applicationNumber} · ${statusLabel(app.status)}`, 12)
-    line(`Learner: ${app.firstName} ${app.middleName || ''} ${app.surname}`)
-    line(`DOB: ${app.dateOfBirth || '—'} · Gender: ${app.gender || '—'} · ID/Passport: ${app.idOrPassport || '—'}`)
-    line(`Grade applying: ${app.gradeApplyingFor || '—'} · Previous school: ${app.previousSchool || '—'}`)
-    line(`Address: ${app.residentialAddress || '—'}`)
-    line(`Parent: ${app.parentFullName || '—'} (${app.parentRelationship || '—'})`)
-    line(`Phone: ${app.parentPhone || '—'} · WhatsApp: ${app.parentWhatsapp || '—'} · Email: ${app.parentEmail || '—'}`)
-    line(`Emergency: ${app.emergencyContact || '—'}`)
-    line(`Medical aid: ${app.medicalAid || '—'} · Doctor: ${app.doctorName || '—'} ${app.doctorContact || ''}`)
-    line(`Conditions: ${app.medicalConditions || '—'} · Allergies: ${app.allergies || '—'}`)
-    line(`Admin notes: ${app.adminNotes || '—'}`)
-    line(`Documents: ${docs.map((d) => d.fileName).join(', ') || 'None'}`)
-    doc.save(`${app.applicationNumber}.pdf`)
+    downloadApplicationPdf(app, docs)
   }
 
   async function downloadDoc(d: ApplicationDocument) {
@@ -201,6 +177,7 @@ export function AdminStudentApplicationsPage() {
   }
 
   const stats = {
+    submitted: rows.filter((r) => r.status === 'submitted').length,
     pending: rows.filter((r) => r.status === 'pending').length,
     review: rows.filter((r) => r.status === 'under_review').length,
     waiting: rows.filter((r) => r.status === 'waiting_for_documents').length,
@@ -224,7 +201,8 @@ export function AdminStudentApplicationsPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <StatCard title="Submitted" value={stats.submitted} />
         <StatCard title="Pending" value={stats.pending} />
         <StatCard title="Under review" value={stats.review} />
         <StatCard title="Waiting for documents" value={stats.waiting} />
@@ -336,6 +314,10 @@ export function AdminStudentApplicationsPage() {
                     {selected.parentPhone} · {selected.parentEmail}
                   </p>
                   <p className="sm:col-span-2">
+                    <span className="text-muted-foreground">Parent address:</span>{' '}
+                    {selected.parentResidentialAddress || '—'}
+                  </p>
+                  <p className="sm:col-span-2">
                     <span className="text-muted-foreground">Medical:</span> {selected.medicalAid || '—'} /{' '}
                     {selected.allergies || 'no allergies noted'}
                   </p>
@@ -420,7 +402,8 @@ export function AdminStudentApplicationsPage() {
                   <div className="space-y-1">
                     {events.map((ev) => (
                       <p key={ev.id} className="text-xs text-muted-foreground">
-                        {formatDateTime(ev.createdAt)} · {ev.toStatus.replace(/_/g, ' ')}
+                        {formatDateTime(ev.createdAt)} ·{' '}
+                        {statusLabel(ev.toStatus as StudentApplicationStatus)}
                         {ev.note ? ` — ${ev.note}` : ''}
                       </p>
                     ))}

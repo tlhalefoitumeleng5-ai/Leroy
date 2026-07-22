@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type
 import {
   Camera,
   CheckCircle2,
+  Download,
+  Eye,
   FileText,
   Image as ImageIcon,
   Loader2,
@@ -17,8 +19,12 @@ import {
   APPLICATION_LANGUAGES,
   DRAFT_STORAGE_KEY,
   detectImageBlur,
+  formatApplicationFileSize,
+  statusLabel,
   uiText,
+  validateApplicationFile,
 } from '@/lib/applications'
+import { downloadApplicationPdf } from '@/lib/applications-pdf'
 import { applicationsApi } from '@/services/applications-api'
 import { streamTutorReply } from '@/lib/caps-tutor'
 import { Button } from '@/components/ui/button'
@@ -50,6 +56,7 @@ type FormState = {
   parentWhatsapp: string
   parentEmail: string
   parentOccupation: string
+  parentResidentialAddress: string
   emergencyContact: string
   medicalAid: string
   medicalConditions: string
@@ -80,6 +87,7 @@ const emptyForm = (locale = 'en-ZA'): FormState => ({
   parentWhatsapp: '',
   parentEmail: '',
   parentOccupation: '',
+  parentResidentialAddress: '',
   emergencyContact: '',
   medicalAid: '',
   medicalConditions: '',
@@ -88,6 +96,39 @@ const emptyForm = (locale = 'en-ZA'): FormState => ({
   doctorContact: '',
   formLocale: locale,
 })
+
+function formFromApplication(app: StudentApplication): FormState {
+  return {
+    applicationType: app.applicationType,
+    firstName: app.firstName,
+    middleName: app.middleName || '',
+    surname: app.surname,
+    dateOfBirth: app.dateOfBirth || '',
+    gender: app.gender || 'prefer_not_to_say',
+    idOrPassport: app.idOrPassport || '',
+    nationality: app.nationality || 'South African',
+    homeLanguage: app.homeLanguage || 'English',
+    gradeApplyingFor: app.gradeApplyingFor || '8',
+    previousSchool: app.previousSchool || '',
+    currentGrade: app.currentGrade || '',
+    residentialAddress: app.residentialAddress || '',
+    parentFullName: app.parentFullName || '',
+    parentRelationship: app.parentRelationship || 'Mother',
+    parentIdNumber: app.parentIdNumber || '',
+    parentPhone: app.parentPhone || '',
+    parentWhatsapp: app.parentWhatsapp || '',
+    parentEmail: app.parentEmail || '',
+    parentOccupation: app.parentOccupation || '',
+    parentResidentialAddress: app.parentResidentialAddress || '',
+    emergencyContact: app.emergencyContact || '',
+    medicalAid: app.medicalAid || '',
+    medicalConditions: app.medicalConditions || '',
+    allergies: app.allergies || '',
+    doctorName: app.doctorName || '',
+    doctorContact: app.doctorContact || '',
+    formLocale: app.formLocale || 'en-ZA',
+  }
+}
 
 function toPayload(form: FormState) {
   return {
@@ -111,6 +152,7 @@ function toPayload(form: FormState) {
     parent_whatsapp: form.parentWhatsapp,
     parent_email: form.parentEmail,
     parent_occupation: form.parentOccupation,
+    parent_residential_address: form.parentResidentialAddress,
     emergency_contact: form.emergencyContact,
     medical_aid: form.medicalAid,
     medical_conditions: form.medicalConditions,
@@ -132,35 +174,70 @@ function Field({ label, children, hint }: { label: string; children: ReactNode; 
 }
 
 type UploadItem = ApplicationDocument & { progress?: number; localPreview?: string }
+type DraftMeta = {
+  id: string
+  accessCode: string
+  applicationNumber: string
+  storageToken: string
+}
+
+function storedDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as { form?: Partial<FormState>; meta?: Partial<DraftMeta> }
+  } catch {
+    return null
+  }
+}
 
 export function StudentApplicationWizard({
   schoolName,
   onSubmitted,
+  initialApplicationType = 'new_student',
+  initialApplication,
+  resumeStoredDraft = false,
+  onSaveAndExit,
 }: {
   schoolName: string
-  onSubmitted: (app: StudentApplication) => void
+  onSubmitted: (app: StudentApplication, documents: ApplicationDocument[]) => void
+  initialApplicationType?: StudentApplicationType
+  initialApplication?: StudentApplication | null
+  resumeStoredDraft?: boolean
+  onSaveAndExit?: () => void
 }) {
   const [step, setStep] = useState<Step>(0)
+  const [furthestStep, setFurthestStep] = useState<Step>(0)
   const [form, setForm] = useState<FormState>(() => {
-    try {
-      const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
-      if (raw) return { ...emptyForm(), ...JSON.parse(raw).form }
-    } catch {
-      /* ignore */
+    if (initialApplication) return formFromApplication(initialApplication)
+    if (resumeStoredDraft) {
+      const saved = storedDraft()
+      if (saved?.form) return { ...emptyForm(), ...saved.form }
     }
-    return emptyForm()
+    return { ...emptyForm(), applicationType: initialApplicationType }
   })
-  const [appMeta, setAppMeta] = useState<{ id: string; accessCode: string; applicationNumber: string } | null>(
-    () => {
-      try {
-        const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
-        if (raw) return JSON.parse(raw).meta ?? null
-      } catch {
-        /* ignore */
+  const [appMeta, setAppMeta] = useState<DraftMeta | null>(() => {
+    if (initialApplication) {
+      return {
+        id: initialApplication.id,
+        accessCode: initialApplication.accessCode,
+        applicationNumber: initialApplication.applicationNumber,
+        storageToken: initialApplication.storageToken || '',
       }
-      return null
-    },
-  )
+    }
+    if (resumeStoredDraft) {
+      const saved = storedDraft()
+      if (saved?.meta?.id && saved.meta.accessCode && saved.meta.applicationNumber) {
+        return {
+          id: saved.meta.id,
+          accessCode: saved.meta.accessCode,
+          applicationNumber: saved.meta.applicationNumber,
+          storageToken: saved.meta.storageToken || '',
+        }
+      }
+    }
+    return null
+  })
   const [docs, setDocs] = useState<UploadItem[]>([])
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
@@ -170,6 +247,8 @@ export function StudentApplicationWizard({
   const [aiReply, setAiReply] = useState('')
   const [aiBusy, setAiBusy] = useState(false)
   const saveTimer = useRef<number | null>(null)
+  const hydratedRef = useRef(false)
+  const saveErrorShownRef = useRef(false)
   const cameraRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploadDocType, setUploadDocType] = useState(APPLICATION_DOC_TYPES[0].id)
@@ -209,8 +288,12 @@ export function StudentApplicationWizard({
         try {
           await applicationsApi.saveDraft(appMeta.id, appMeta.accessCode, toPayload(form))
           setSavedAt(new Date().toLocaleTimeString())
+          saveErrorShownRef.current = false
         } catch {
-          /* keep local draft */
+          if (!saveErrorShownRef.current) {
+            toast.warning('Saved on this device. The secure online draft will retry when your connection returns.')
+            saveErrorShownRef.current = true
+          }
         } finally {
           setSaving(false)
         }
@@ -233,24 +316,56 @@ export function StudentApplicationWizard({
       id: created.id,
       accessCode: created.accessCode,
       applicationNumber: created.applicationNumber,
+      storageToken: created.storageToken || '',
     }
     setAppMeta(meta)
     await applicationsApi.saveDraft(meta.id, meta.accessCode, toPayload(form))
     return meta
   }
 
-  async function loadDocs(id: string) {
-    if (!appMeta) return
-    const tracked = await applicationsApi.trackById(id, appMeta.accessCode)
+  async function loadDocs(meta: DraftMeta) {
+    const tracked = await applicationsApi.trackById(meta.id, meta.accessCode)
     setDocs(tracked.documents)
+    if (tracked.application.storageToken && tracked.application.storageToken !== meta.storageToken) {
+      setAppMeta((current) =>
+        current ? { ...current, storageToken: tracked.application.storageToken || '' } : current,
+      )
+    }
   }
+
+  useEffect(() => {
+    if (!appMeta || hydratedRef.current) return
+    hydratedRef.current = true
+    void loadDocs(appMeta).catch((err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not restore uploaded documents')
+    })
+  }, [appMeta])
+
+  useEffect(() => {
+    if (step !== 3 || !appMeta) return
+    void loadDocs(appMeta).catch(() => {
+      /* The existing upload list remains available while offline. */
+    })
+  }, [step, appMeta])
 
   async function handleFiles(fileList: FileList | File[] | null) {
     if (!fileList || fileList.length === 0) return
+    const files = Array.from(fileList)
+    const validationResults = await Promise.all(
+      files.map(async (file) => ({ file, issue: await validateApplicationFile(file) })),
+    )
+    const validFiles = validationResults.flatMap(({ file, issue }) => {
+      if (issue) {
+        toast.error(issue)
+        return []
+      }
+      return [file]
+    })
+    if (validFiles.length === 0) return
     const meta = await ensureDraft()
-    for (const file of Array.from(fileList)) {
+    for (const file of validFiles) {
       const tempId = crypto.randomUUID()
-      const localPreview = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
+      const localPreview = URL.createObjectURL(file)
       setDocs((prev) => [
         ...prev,
         {
@@ -275,6 +390,7 @@ export function StudentApplicationWizard({
         const uploaded = await applicationsApi.uploadDocument({
           applicationId: meta.id,
           accessCode: meta.accessCode,
+          storageToken: meta.storageToken,
           docType: uploadDocType,
           file,
           onProgress: (pct) =>
@@ -287,6 +403,7 @@ export function StudentApplicationWizard({
           toast.success(`${file.name} uploaded`)
         }
       } catch (err) {
+        URL.revokeObjectURL(localPreview)
         setDocs((prev) => prev.filter((d) => d.id !== tempId))
         toast.error(err instanceof Error ? err.message : 'Upload failed')
       }
@@ -300,6 +417,7 @@ export function StudentApplicationWizard({
     }
     try {
       await applicationsApi.deleteDocument(doc.id, appMeta.id, appMeta.accessCode)
+      if (doc.localPreview) URL.revokeObjectURL(doc.localPreview)
       setDocs((prev) => prev.filter((d) => d.id !== doc.id))
       toast.success('File removed')
     } catch (err) {
@@ -313,12 +431,86 @@ export function StudentApplicationWizard({
     void handleFiles(e.dataTransfer.files)
   }
 
+  const requiredDocuments = APPLICATION_DOC_TYPES.filter((document) =>
+    form.applicationType === 'new_student' ? document.requiredForNew : document.requiredForReturning,
+  )
+
+  function validationMessage(targetStep: Step): string | null {
+    if (targetStep === 0) {
+      const missing = [
+        ['First Name', form.firstName],
+        ['Surname', form.surname],
+        ['Date of Birth', form.dateOfBirth],
+        ['ID Number or Passport Number', form.idOrPassport],
+        ['Nationality', form.nationality],
+        ['Grade Applying For', form.gradeApplyingFor],
+        ['Residential Address', form.residentialAddress],
+      ].filter(([, value]) => !value.trim())
+      if (form.applicationType === 'returning_student' && !form.currentGrade.trim()) {
+        missing.push(['Current Grade', form.currentGrade])
+      }
+      if (missing.length) return `Complete: ${missing.map(([label]) => label).join(', ')}`
+    }
+
+    if (targetStep === 1) {
+      const missing = [
+        ['Parent Full Name', form.parentFullName],
+        ['Relationship', form.parentRelationship],
+        ['Parent ID Number', form.parentIdNumber],
+        ['Phone Number', form.parentPhone],
+        ['WhatsApp Number', form.parentWhatsapp],
+        ['Email Address', form.parentEmail],
+        ['Occupation', form.parentOccupation],
+        ['Parent Residential Address', form.parentResidentialAddress],
+        ['Emergency Contact', form.emergencyContact],
+      ].filter(([, value]) => !value.trim())
+      if (missing.length) return `Complete: ${missing.map(([label]) => label).join(', ')}`
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.parentEmail)) return 'Enter a valid parent email address'
+    }
+
+    if (targetStep === 3) {
+      const missing = requiredDocuments.filter(
+        (required) =>
+          !docs.some(
+            (document) =>
+              document.docType === required.id &&
+              (document.progress == null || document.progress === 100),
+          ),
+      )
+      if (missing.length) return `Upload required documents: ${missing.map((item) => item.label).join(', ')}`
+    }
+
+    return null
+  }
+
   async function goNext() {
+    const issue = validationMessage(step)
+    if (issue) {
+      toast.error(issue)
+      return
+    }
     try {
       setBusy(true)
       const meta = await ensureDraft()
-      if (step === 3) await loadDocs(meta.id)
-      setStep((s) => Math.min(4, s + 1) as Step)
+      if (step === 3) await loadDocs(meta)
+      const next = Math.min(4, step + 1) as Step
+      setFurthestStep((current) => Math.max(current, next) as Step)
+      setStep(next)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not save draft')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function saveAndExit() {
+    try {
+      setBusy(true)
+      const meta = await ensureDraft()
+      await applicationsApi.saveDraft(meta.id, meta.accessCode, toPayload(form))
+      setSavedAt(new Date().toLocaleTimeString())
+      toast.success(`Draft ${meta.applicationNumber} saved. You can continue later.`)
+      onSaveAndExit?.()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save draft')
     } finally {
@@ -327,13 +519,18 @@ export function StudentApplicationWizard({
   }
 
   async function submit() {
+    const issue = ([0, 1, 3] as Step[]).map(validationMessage).find(Boolean)
+    if (issue) {
+      toast.error(issue)
+      return
+    }
     try {
       setBusy(true)
       const meta = await ensureDraft()
       await applicationsApi.saveDraft(meta.id, meta.accessCode, toPayload(form))
       const submitted = await applicationsApi.submitApplication(meta.id, meta.accessCode)
       localStorage.removeItem(DRAFT_STORAGE_KEY)
-      onSubmitted(submitted)
+      onSubmitted(submitted, docs)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Submit failed')
     } finally {
@@ -414,14 +611,16 @@ export function StudentApplicationWizard({
           <button
             key={s.id}
             type="button"
+            disabled={s.id > furthestStep}
             onClick={() => setStep(s.id)}
+            aria-current={step === s.id ? 'step' : undefined}
             className={cn(
               'shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition',
               step === s.id
                 ? 'border-sky-600 bg-sky-600 text-white'
-                : step > s.id
+                : furthestStep >= s.id
                   ? 'border-sky-200 bg-sky-50 text-sky-800'
-                  : 'border-slate-200 bg-white text-slate-600',
+                  : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400',
             )}
           >
             {s.label}
@@ -567,6 +766,15 @@ export function StudentApplicationWizard({
                 <Input value={form.parentOccupation} onChange={(e) => patch('parentOccupation', e.target.value)} />
               </Field>
               <div className="sm:col-span-2">
+                <Field label="Residential Address">
+                  <Textarea
+                    value={form.parentResidentialAddress}
+                    onChange={(e) => patch('parentResidentialAddress', e.target.value)}
+                    rows={3}
+                  />
+                </Field>
+              </div>
+              <div className="sm:col-span-2">
                 <Field label="Emergency Contact">
                   <Textarea
                     value={form.emergencyContact}
@@ -639,7 +847,9 @@ export function StudentApplicationWizard({
               >
                 <Upload className="mx-auto h-8 w-8 text-sky-600" />
                 <p className="mt-2 text-sm font-medium text-slate-800">Drag & drop files here</p>
-                <p className="text-xs text-slate-500">Camera · Gallery · PDF · DOCX · multiple files</p>
+                <p className="text-xs text-slate-500">
+                  Camera · Gallery · PDF · DOCX · JPG · PNG · multiple files · max 15 MB each
+                </p>
                 <div className="mt-3 flex flex-wrap justify-center gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => cameraRef.current?.click()}>
                     <Camera className="mr-1 h-4 w-4" /> Camera
@@ -654,7 +864,11 @@ export function StudentApplicationWizard({
                   accept="image/*"
                   capture="environment"
                   className="hidden"
-                  onChange={(e) => void handleFiles(e.target.files)}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || [])
+                    e.target.value = ''
+                    void handleFiles(files)
+                  }}
                 />
                 <input
                   ref={fileRef}
@@ -662,17 +876,21 @@ export function StudentApplicationWizard({
                   accept="image/*,.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   multiple
                   className="hidden"
-                  onChange={(e) => void handleFiles(e.target.files)}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || [])
+                    e.target.value = ''
+                    void handleFiles(files)
+                  }}
                 />
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2">
                 {docs.map((d) => (
                   <div key={d.id} className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-2">
-                    {d.localPreview || (d.signedUrl && d.mimeType?.startsWith('image/')) ? (
+                    {d.mimeType?.startsWith('image/') && (d.localPreview || d.signedUrl) ? (
                       <img
                         src={d.localPreview || d.signedUrl}
-                        alt=""
+                        alt={`Preview of ${d.fileName}`}
                         className="h-28 w-full rounded-lg object-cover"
                       />
                     ) : (
@@ -683,12 +901,24 @@ export function StudentApplicationWizard({
                     <p className="mt-1 truncate text-xs font-medium">{d.fileName}</p>
                     <p className="text-[10px] text-slate-500">
                       {APPLICATION_DOC_TYPES.find((x) => x.id === d.docType)?.label || d.docType}
+                      {' · '}
+                      {formatApplicationFileSize(d.fileSize)}
                       {d.isBlurry ? ' · Blurry?' : ''}
                     </p>
                     {d.progress != null && d.progress < 100 ? (
                       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
                         <div className="h-full bg-sky-600 transition-all" style={{ width: `${d.progress}%` }} />
                       </div>
+                    ) : null}
+                    {d.localPreview || d.signedUrl ? (
+                      <a
+                        href={d.localPreview || d.signedUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:underline"
+                      >
+                        <Eye className="h-3.5 w-3.5" /> Preview
+                      </a>
                     ) : null}
                     <button
                       type="button"
@@ -718,7 +948,44 @@ export function StudentApplicationWizard({
                   Parent: {form.parentFullName} · {form.parentPhone} · {form.parentEmail}
                 </p>
               </div>
-              <p className="text-slate-600">{docs.length} document(s) attached</p>
+              <div className="space-y-2 rounded-xl border border-slate-200 p-3">
+                <p className="font-semibold text-slate-900">Document checklist</p>
+                {APPLICATION_DOC_TYPES.map((documentType) => {
+                  const uploaded = docs.filter((document) => document.docType === documentType.id)
+                  const required =
+                    form.applicationType === 'new_student'
+                      ? documentType.requiredForNew
+                      : documentType.requiredForReturning
+                  if (!required && uploaded.length === 0) return null
+                  return (
+                    <div
+                      key={documentType.id}
+                      className="flex flex-col gap-1 rounded-lg bg-slate-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <span className="text-xs text-slate-700">
+                        {documentType.label} {required ? '*' : ''}
+                      </span>
+                      {uploaded.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {uploaded.map((document) => (
+                            <a
+                              key={document.id}
+                              href={document.localPreview || document.signedUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:underline"
+                            >
+                              <Eye className="h-3.5 w-3.5" /> {document.fileName}
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <Badge variant="warning">Missing</Badge>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
               {appMeta ? (
                 <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                   After submit, track with <strong>{appMeta.applicationNumber}</strong> and access code{' '}
@@ -729,9 +996,19 @@ export function StudentApplicationWizard({
           ) : null}
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4">
-            <Button type="button" variant="outline" disabled={step === 0 || busy} onClick={() => setStep((s) => (s - 1) as Step)}>
-              {t('back')}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={step === 0 || busy}
+                onClick={() => setStep((s) => (s - 1) as Step)}
+              >
+                {t('back')}
+              </Button>
+              <Button type="button" variant="secondary" disabled={busy} onClick={() => void saveAndExit()}>
+                {t('continueLater')}
+              </Button>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="ghost" onClick={() => setAiOpen((v) => !v)}>
                 <Sparkles className="mr-1 h-4 w-4" /> {t('help')}
@@ -784,7 +1061,13 @@ export function StudentApplicationWizard({
   )
 }
 
-export function ApplicationSuccess({ app }: { app: StudentApplication }) {
+export function ApplicationSuccess({
+  app,
+  documents = [],
+}: {
+  app: StudentApplication
+  documents?: ApplicationDocument[]
+}) {
   return (
     <Card className="mx-auto max-w-lg border-sky-100 shadow-lg animate-slide-up">
       <CardHeader>
@@ -801,11 +1084,15 @@ export function ApplicationSuccess({ app }: { app: StudentApplication }) {
         <p>
           Access code: <span className="font-mono text-base font-bold text-sky-800">{app.accessCode}</span>
         </p>
-        <Badge variant="secondary">Pending</Badge>
+        <Badge variant="secondary">{statusLabel(app.status)}</Badge>
         <p className="text-slate-600">
           We queued email, WhatsApp and SMS confirmations to the parent contacts. Use your number and access code anytime
           to track status.
         </p>
+        <Button type="button" className="w-full" onClick={() => downloadApplicationPdf(app, documents)}>
+          <Download className="mr-1.5 h-4 w-4" />
+          Download application PDF
+        </Button>
       </CardContent>
     </Card>
   )

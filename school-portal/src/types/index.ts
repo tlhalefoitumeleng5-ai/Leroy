@@ -9,6 +9,7 @@ export type Gender = 'male' | 'female' | 'other' | 'prefer_not_to_say'
 export type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'waiting_list'
 export type StudentApplicationStatus =
   | 'draft'
+  | 'submitted'
   | 'pending'
   | 'under_review'
   | 'approved'
@@ -282,8 +283,10 @@ export interface Admission {
 export interface StudentApplication {
   id: string
   schoolId: string
+  applicantUserId?: string
   applicationNumber: string
   accessCode: string
+  storageToken?: string
   applicationType: StudentApplicationType
   status: StudentApplicationStatus
   firstName: string
@@ -305,6 +308,7 @@ export interface StudentApplication {
   parentWhatsapp?: string
   parentEmail?: string
   parentOccupation?: string
+  parentResidentialAddress?: string
   emergencyContact?: string
   medicalAid?: string
   medicalConditions?: string

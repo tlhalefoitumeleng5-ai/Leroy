@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Loader2, Search } from 'lucide-react'
@@ -10,19 +10,26 @@ import { Badge, Card, CardContent, CardHeader, CardTitle } from '@/components/ui
 import { formatDateTime, cn } from '@/lib/utils'
 import type { ApplicationDocument, ApplicationStatusEvent, StudentApplication } from '@/types'
 
-export function TrackApplicationPage({ embedded = false }: { embedded?: boolean }) {
-  const [number, setNumber] = useState('')
-  const [code, setCode] = useState('')
+export function TrackApplicationPage({
+  embedded = false,
+  initialNumber = '',
+  initialCode = '',
+}: {
+  embedded?: boolean
+  initialNumber?: string
+  initialCode?: string
+}) {
+  const [number, setNumber] = useState(initialNumber)
+  const [code, setCode] = useState(initialCode)
   const [busy, setBusy] = useState(false)
   const [app, setApp] = useState<StudentApplication | null>(null)
   const [docs, setDocs] = useState<ApplicationDocument[]>([])
   const [events, setEvents] = useState<ApplicationStatusEvent[]>([])
 
-  async function track(e: React.FormEvent) {
-    e.preventDefault()
+  async function loadStatus(applicationNumber: string, accessCode: string) {
     setBusy(true)
     try {
-      const res = await applicationsApi.track(number, code)
+      const res = await applicationsApi.track(applicationNumber, accessCode)
       setApp(res.application)
       setDocs(res.documents)
       setEvents(res.events)
@@ -33,6 +40,18 @@ export function TrackApplicationPage({ embedded = false }: { embedded?: boolean 
       setBusy(false)
     }
   }
+
+  async function track(e: React.FormEvent) {
+    e.preventDefault()
+    await loadStatus(number, code)
+  }
+
+  useEffect(() => {
+    if (!initialNumber || !initialCode) return
+    setNumber(initialNumber)
+    setCode(initialCode)
+    void loadStatus(initialNumber, initialCode)
+  }, [initialNumber, initialCode])
 
   return (
     <div
@@ -75,7 +94,7 @@ export function TrackApplicationPage({ embedded = false }: { embedded?: boolean 
               <Input
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="6-digit code"
+                placeholder="Access code"
                 required
               />
             </div>
@@ -132,7 +151,7 @@ export function TrackApplicationPage({ embedded = false }: { embedded?: boolean 
             <CardContent className="space-y-2">
               {events.map((ev) => (
                 <div key={ev.id} className="rounded-lg border border-slate-100 px-3 py-2 text-sm">
-                  <p className="font-medium">{ev.toStatus.replace(/_/g, ' ')}</p>
+                  <p className="font-medium">{statusLabel(ev.toStatus as StudentApplication['status'])}</p>
                   {ev.note ? <p className="text-slate-600">{ev.note}</p> : null}
                   <p className="text-[11px] text-slate-400">{formatDateTime(ev.createdAt)}</p>
                 </div>

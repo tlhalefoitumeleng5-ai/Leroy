@@ -6,12 +6,19 @@ import {
   ApplicationSuccess,
   StudentApplicationWizard,
 } from '@/pages/public/StudentApplicationWizard'
+import { ApplicationHomePage } from '@/pages/public/ApplicationHomePage'
 import { Button } from '@/components/ui/button'
-import type { StudentApplication } from '@/types'
+import { DRAFT_STORAGE_KEY, readSavedApplicationDraftSummary } from '@/lib/applications'
+import type { ApplicationDocument, StudentApplication, StudentApplicationType } from '@/types'
+
+type Submission = { application: StudentApplication; documents: ApplicationDocument[] }
 
 export function StudentApplicationsPublicPage() {
   const [schoolName, setSchoolName] = useState('School')
-  const [submitted, setSubmitted] = useState<StudentApplication | null>(null)
+  const [submitted, setSubmitted] = useState<Submission | null>(null)
+  const [applicationType, setApplicationType] = useState<StudentApplicationType | null>(null)
+  const [resumeStoredDraft, setResumeStoredDraft] = useState(false)
+  const [savedDraft, setSavedDraft] = useState(readSavedApplicationDraftSummary)
 
   useEffect(() => {
     void applicationsApi.getSchoolName().then(setSchoolName)
@@ -39,7 +46,7 @@ export function StudentApplicationsPublicPage() {
 
       {submitted ? (
         <div className="space-y-4">
-          <ApplicationSuccess app={submitted} />
+          <ApplicationSuccess app={submitted.application} documents={submitted.documents} />
           <div className="mx-auto flex max-w-lg justify-center gap-2">
             <Link to="/apply/track">
               <Button>Track status</Button>
@@ -48,14 +55,46 @@ export function StudentApplicationsPublicPage() {
               variant="outline"
               onClick={() => {
                 setSubmitted(null)
+                setApplicationType(null)
               }}
             >
               New application
             </Button>
           </div>
         </div>
+      ) : applicationType ? (
+        <StudentApplicationWizard
+          key={`${applicationType}-${resumeStoredDraft ? 'saved' : 'new'}`}
+          schoolName={schoolName}
+          initialApplicationType={applicationType}
+          resumeStoredDraft={resumeStoredDraft}
+          onSubmitted={(application, documents) => {
+            setSubmitted({ application, documents })
+            setApplicationType(null)
+            setSavedDraft(null)
+          }}
+          onSaveAndExit={() => {
+            setApplicationType(null)
+            setResumeStoredDraft(false)
+            setSavedDraft(readSavedApplicationDraftSummary())
+          }}
+        />
       ) : (
-        <StudentApplicationWizard schoolName={schoolName} onSubmitted={setSubmitted} />
+        <ApplicationHomePage
+          schoolName={schoolName}
+          savedDraft={savedDraft}
+          onStart={(type) => {
+            localStorage.removeItem(DRAFT_STORAGE_KEY)
+            setSavedDraft(null)
+            setResumeStoredDraft(false)
+            setApplicationType(type)
+          }}
+          onResumeSaved={() => {
+            if (!savedDraft) return
+            setResumeStoredDraft(true)
+            setApplicationType(savedDraft.applicationType)
+          }}
+        />
       )}
     </div>
   )
