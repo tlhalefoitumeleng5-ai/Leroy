@@ -137,7 +137,7 @@ BEGIN
     );
 
     IF v_model LIKE 'gpt-4%' THEN
-      v_payload := v_payload || jsonb_build_object('temperature', 0.35);
+      v_payload := v_payload || jsonb_build_object('temperature', 0.7);
     END IF;
 
     BEGIN

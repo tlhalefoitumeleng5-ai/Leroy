@@ -335,11 +335,11 @@ export function StudentAiTutorPage() {
     <div className="mx-auto flex max-w-6xl flex-col gap-4 animate-fade-in pb-6">
       <PageHeader
         title="AI Assistant"
-        description="GPT-5.5 CAPS assistant · streaming · photos, docs & voice"
+        description="ChatGPT-style help · answers anything · asks you back · CAPS strong"
         actions={
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary" className="gap-1">
-              <Sparkles className="h-3 w-3" /> CAPS · 12 languages
+              <Sparkles className="h-3 w-3" /> Ask anything · 12 languages
             </Badge>
             {providerHint === 'openai' ? (
               <Badge variant="success">{modelUsed || 'GPT-5.5'} live</Badge>
@@ -420,7 +420,7 @@ export function StudentAiTutorPage() {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold text-sm">Leroy AI Assistant</p>
                 <p className="truncate text-[11px] text-muted-foreground">
-                  GPT-5.5 · Maths · Sciences · Languages · Essays · Coding
+                  Like ChatGPT · does the work · asks follow-ups · no app/website building
                 </p>
               </div>
               <Button
@@ -498,11 +498,16 @@ export function StudentAiTutorPage() {
                   Sawubona{user.profile.firstName ? `, ${user.profile.firstName}` : ''}!
                 </p>
                 <p>
-                  Attach a homework photo, PDF, Word, Excel or PowerPoint with the <strong>+</strong> button — or record
-                  your voice. I read handwriting and reply in all official South African languages.
+                  Ask me anything — homework, essays, maths, life questions, research, or study plans. I answer like
+                  ChatGPT: I do most of the work, then ask what you want next. I won’t build apps or websites.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {['Explain this photo', 'Summarise my PDF', 'Quiz me in isiZulu'].map((s) => (
+                  {[
+                    'Explain this step by step',
+                    'Write my essay draft',
+                    'Solve this maths problem',
+                    'Quiz me and ask follow-ups',
+                  ].map((s) => (
                     <button
                       key={s}
                       type="button"
@@ -743,7 +748,7 @@ export function StudentAiTutorPage() {
               <Textarea
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Message AI Assistant…"
+                placeholder="Ask anything — I’ll do the work and ask you back…"
                 className="min-h-11 max-h-36 flex-1 resize-y rounded-2xl border-border bg-muted/30 px-3 py-2.5"
                 rows={1}
                 enterKeyHint="send"

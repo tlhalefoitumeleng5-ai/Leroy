@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
         stream: wantStream,
         messages: [{ role: 'system', content: system }, ...messages],
       }
-      if (String(model).startsWith('gpt-4')) payload.temperature = 0.35
+      if (String(model).startsWith('gpt-4')) payload.temperature = 0.7
 
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
