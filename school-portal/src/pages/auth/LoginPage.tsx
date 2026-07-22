@@ -116,7 +116,11 @@ export function LoginPage() {
 
             <div className="mt-4 flex flex-wrap gap-2 text-center text-sm">
               <Link to="/apply" className="text-primary hover:underline">
-                Online application
+                Student applications
+              </Link>
+              {' · '}
+              <Link to="/apply/track" className="text-primary hover:underline">
+                Track status
               </Link>
               <span className="text-muted-foreground">·</span>
               <Link to="/verify-email" className="text-primary hover:underline">

@@ -7,6 +7,8 @@ import { LoginPage } from '@/pages/auth/LoginPage'
 import { ForgotPasswordPage, VerifyEmailPage } from '@/pages/auth/ForgotPasswordPage'
 import { AccountPage } from '@/pages/auth/AccountPage'
 import { AdmissionApplicationPage } from '@/pages/public/AdmissionApplicationPage'
+import { StudentApplicationsPublicPage } from '@/pages/public/StudentApplicationsPublicPage'
+import { TrackApplicationPage } from '@/pages/public/TrackApplicationPage'
 import { SupabaseSetupPage } from '@/pages/public/SupabaseSetupPage'
 import {
   StudentAnnouncementsPage,
@@ -61,6 +63,7 @@ import {
   SuperSchoolsPage,
   SuperUsersPage,
 } from '@/pages/admin/AdminPages'
+import { AdminStudentApplicationsPage } from '@/pages/admin/AdminStudentApplicationsPage'
 import {
   AdminFeesPage,
   AdminWhatsAppPage,
@@ -93,7 +96,9 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
-      <Route path="/apply" element={<AdmissionApplicationPage />} />
+      <Route path="/apply" element={<StudentApplicationsPublicPage />} />
+      <Route path="/apply/track" element={<TrackApplicationPage />} />
+      <Route path="/apply/legacy" element={<AdmissionApplicationPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
@@ -153,6 +158,7 @@ export default function App() {
             <Route path="/admin/classes" element={<AdminClassesPage />} />
             <Route path="/admin/timetable" element={<AdminTimetablePage />} />
             <Route path="/admin/admissions" element={<AdminAdmissionsPage />} />
+            <Route path="/admin/applications" element={<AdminStudentApplicationsPage />} />
             <Route path="/admin/reports" element={<AdminReportsPage />} />
             <Route path="/admin/calendar" element={<AdminCalendarPage />} />
             <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />

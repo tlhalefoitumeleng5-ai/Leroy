@@ -7,6 +7,25 @@ export type UserRole =
 
 export type Gender = 'male' | 'female' | 'other' | 'prefer_not_to_say'
 export type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'waiting_list'
+export type StudentApplicationStatus =
+  | 'draft'
+  | 'pending'
+  | 'under_review'
+  | 'approved'
+  | 'rejected'
+  | 'waiting_for_documents'
+export type StudentApplicationType = 'new_student' | 'returning_student'
+export type ApplicationDocType =
+  | 'birth_certificate'
+  | 'id_copy'
+  | 'parent_id'
+  | 'latest_report'
+  | 'transfer_letter'
+  | 'proof_of_residence'
+  | 'passport_photo'
+  | 'vaccination_card'
+  | 'court_documents'
+  | 'other'
 export type AttendanceStatus = 'present' | 'late' | 'absent'
 export type AssessmentType = 'homework' | 'assignment' | 'test' | 'exam' | 'project' | 'oral'
 export type NotificationType =
@@ -258,6 +277,85 @@ export interface Admission {
   reviewNotes?: string
   createdAt: string
   updatedAt: string
+}
+
+export interface StudentApplication {
+  id: string
+  schoolId: string
+  applicationNumber: string
+  accessCode: string
+  applicationType: StudentApplicationType
+  status: StudentApplicationStatus
+  firstName: string
+  middleName?: string
+  surname: string
+  dateOfBirth?: string
+  gender?: string
+  idOrPassport?: string
+  nationality?: string
+  homeLanguage?: string
+  gradeApplyingFor?: string
+  previousSchool?: string
+  currentGrade?: string
+  residentialAddress?: string
+  parentFullName?: string
+  parentRelationship?: string
+  parentIdNumber?: string
+  parentPhone?: string
+  parentWhatsapp?: string
+  parentEmail?: string
+  parentOccupation?: string
+  emergencyContact?: string
+  medicalAid?: string
+  medicalConditions?: string
+  allergies?: string
+  doctorName?: string
+  doctorContact?: string
+  formLocale?: string
+  isDraft: boolean
+  adminNotes?: string
+  missingDocumentsNote?: string
+  reviewedBy?: string
+  reviewedAt?: string
+  submittedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ApplicationDocument {
+  id: string
+  applicationId: string
+  docType: ApplicationDocType | string
+  fileName: string
+  mimeType?: string
+  storagePath: string
+  fileSize: number
+  isBlurry: boolean
+  createdAt: string
+  signedUrl?: string
+}
+
+export interface ApplicationStatusEvent {
+  id: string
+  applicationId: string
+  fromStatus?: string
+  toStatus: string
+  note?: string
+  actorId?: string
+  createdAt: string
+}
+
+export interface ApplicationNotification {
+  id: string
+  applicationId: string
+  channel: 'email' | 'whatsapp' | 'sms'
+  recipient: string
+  subject?: string
+  body: string
+  status: 'queued' | 'sent' | 'failed' | 'skipped'
+  error?: string
+  createdAt: string
+  sentAt?: string
 }
 
 export interface AttendanceRecord {

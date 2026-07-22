@@ -1548,7 +1548,7 @@ class LiveApi {
 
     // Prefer secure edge function (school OpenAI key)
     try {
-      const historyPayload = prior.slice(-20).map((h) => ({ role: h.role, content: h.content }))
+      const historyPayload = prior.slice(-36).map((h) => ({ role: h.role, content: h.content }))
       const docBlock = docText ? `\n\nUploaded document text:\n${docText.slice(0, 18000)}` : ''
       const userMsg =
         input.imageDataUrl
@@ -1586,7 +1586,7 @@ class LiveApi {
     // School OpenAI key via secure DB proxy
     if (!reply) {
       try {
-        const historyPayload = prior.slice(-20).map((h) => ({ role: h.role, content: h.content }))
+        const historyPayload = prior.slice(-36).map((h) => ({ role: h.role, content: h.content }))
         const docBlock = docText ? `\n\nUploaded document text:\n${docText.slice(0, 18000)}` : ''
         const userMsg =
           input.imageDataUrl
@@ -1725,7 +1725,7 @@ class LiveApi {
       learnerName: input.learnerName,
     })
 
-    const historyPayload = prior.slice(-20).map((h) => ({ role: h.role, content: h.content }))
+    const historyPayload = prior.slice(-36).map((h) => ({ role: h.role, content: h.content }))
     const docBlock = docText ? `\n\nUploaded document text:\n${docText.slice(0, 18000)}` : ''
     const userMsg =
       input.imageDataUrl

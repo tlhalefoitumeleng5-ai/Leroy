@@ -354,7 +354,7 @@ async function callOpenAiChat(
 }
 
 function buildOpenAiMessages(req: TutorRequest) {
-  const history = (req.history ?? []).slice(-24)
+  const history = (req.history ?? []).slice(-40)
   const messages: Array<Record<string, unknown>> = []
   for (const h of history) {
     if (h.imageDataUrl) {
