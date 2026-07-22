@@ -351,10 +351,15 @@ export function StudentApplicationWizard({
   async function handleFiles(fileList: FileList | File[] | null) {
     if (!fileList || fileList.length === 0) return
     const files = Array.from(fileList)
-    const validFiles = files.filter((file) => {
-      const issue = validateApplicationFile(file)
-      if (issue) toast.error(issue)
-      return !issue
+    const validationResults = await Promise.all(
+      files.map(async (file) => ({ file, issue: await validateApplicationFile(file) })),
+    )
+    const validFiles = validationResults.flatMap(({ file, issue }) => {
+      if (issue) {
+        toast.error(issue)
+        return []
+      }
+      return [file]
     })
     if (validFiles.length === 0) return
     const meta = await ensureDraft()

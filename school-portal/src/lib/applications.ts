@@ -272,7 +272,62 @@ const ALLOWED_APPLICATION_MIME_TYPES = new Set([
   'image/png',
 ])
 
-export function validateApplicationFile(file: File): string | null {
+const FILE_SIGNATURES = {
+  pdf: [0x25, 0x50, 0x44, 0x46, 0x2d],
+  doc: [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1],
+  docx: [0x50, 0x4b, 0x03, 0x04],
+  jpg: [0xff, 0xd8, 0xff],
+  png: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+} as const
+
+const WORD_DOCUMENT_STREAM = new Uint8Array(
+  Array.from('WordDocument\0').flatMap((character) => [character.charCodeAt(0), 0]),
+)
+
+function startsWithSignature(bytes: Uint8Array, signature: readonly number[]) {
+  return bytes.length >= signature.length && signature.every((byte, index) => bytes[index] === byte)
+}
+
+function includesSignature(bytes: Uint8Array, signature: Uint8Array) {
+  outer: for (let index = 0; index <= bytes.length - signature.length; index += 1) {
+    for (let offset = 0; offset < signature.length; offset += 1) {
+      if (bytes[index + offset] !== signature[offset]) continue outer
+    }
+    return true
+  }
+  return false
+}
+
+async function hasApplicationFileSignature(file: File, extension: string) {
+  if (extension === 'doc' || extension === 'docx') {
+    const buffer = await file.arrayBuffer()
+    const bytes = new Uint8Array(buffer)
+
+    if (extension === 'doc') {
+      return (
+        startsWithSignature(bytes, FILE_SIGNATURES.doc) &&
+        includesSignature(bytes, WORD_DOCUMENT_STREAM)
+      )
+    }
+
+    if (!startsWithSignature(bytes, FILE_SIGNATURES.docx)) return false
+    const { default: JSZip } = await import('jszip')
+    const archive = await JSZip.loadAsync(buffer)
+    const contentTypes = archive.file('[Content_Types].xml')
+    if (!contentTypes || !archive.file('word/document.xml')) return false
+    const contentTypesXml = await contentTypes.async('string')
+    return contentTypesXml.includes(
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',
+    )
+  }
+
+  const signature = extension === 'jpeg' ? FILE_SIGNATURES.jpg : FILE_SIGNATURES[extension as 'pdf' | 'jpg' | 'png']
+  if (!signature) return false
+  const bytes = new Uint8Array(await file.slice(0, signature.length).arrayBuffer())
+  return startsWithSignature(bytes, signature)
+}
+
+export async function validateApplicationFile(file: File): Promise<string | null> {
   const extension = file.name.split('.').pop()?.toLowerCase() || ''
   const supportedType =
     ALLOWED_APPLICATION_FILE_EXTENSIONS.has(extension) &&
@@ -285,7 +340,16 @@ export function validateApplicationFile(file: File): string | null {
   if (file.size > MAX_APPLICATION_FILE_BYTES) {
     return `${file.name} is larger than the 15 MB limit.`
   }
-  return null
+
+  let signatureMatches = false
+  try {
+    signatureMatches = await hasApplicationFileSignature(file, extension)
+  } catch {
+    signatureMatches = false
+  }
+  return signatureMatches
+    ? null
+    : `${file.name} does not contain valid ${extension.toUpperCase()} file content.`
 }
 
 export function formatApplicationFileSize(bytes: number) {

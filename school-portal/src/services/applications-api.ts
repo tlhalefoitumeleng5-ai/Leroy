@@ -1,5 +1,5 @@
 import { requireSupabase, supabase } from '@/lib/supabase'
-import { APPLICATION_DOC_TYPES, detectImageBlur } from '@/lib/applications'
+import { APPLICATION_DOC_TYPES, detectImageBlur, validateApplicationFile } from '@/lib/applications'
 import type {
   ApplicationDocument,
   ApplicationNotification,
@@ -365,6 +365,9 @@ export const applicationsApi = {
     file: File
     onProgress?: (pct: number) => void
   }): Promise<ApplicationDocument> {
+    const validationIssue = await validateApplicationFile(input.file)
+    if (validationIssue) throw new Error(validationIssue)
+
     const sb = requireSupabase()
     input.onProgress?.(10)
     const isBlurry = await detectImageBlur(input.file)
