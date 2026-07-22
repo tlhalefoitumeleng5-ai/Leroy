@@ -13,8 +13,10 @@ function mapApp(row: Record<string, unknown>): StudentApplication {
   return {
     id: String(row.id),
     schoolId: String(row.school_id),
+    applicantUserId: row.applicant_user_id ? String(row.applicant_user_id) : undefined,
     applicationNumber: String(row.application_number),
     accessCode: String(row.access_code),
+    storageToken: row.storage_token ? String(row.storage_token) : undefined,
     applicationType: row.application_type as StudentApplicationType,
     status: row.status as StudentApplicationStatus,
     firstName: String(row.first_name ?? ''),
@@ -36,6 +38,9 @@ function mapApp(row: Record<string, unknown>): StudentApplication {
     parentWhatsapp: row.parent_whatsapp ? String(row.parent_whatsapp) : undefined,
     parentEmail: row.parent_email ? String(row.parent_email) : undefined,
     parentOccupation: row.parent_occupation ? String(row.parent_occupation) : undefined,
+    parentResidentialAddress: row.parent_residential_address
+      ? String(row.parent_residential_address)
+      : undefined,
     emergencyContact: row.emergency_contact ? String(row.emergency_contact) : undefined,
     medicalAid: row.medical_aid ? String(row.medical_aid) : undefined,
     medicalConditions: row.medical_conditions ? String(row.medical_conditions) : undefined,
@@ -57,26 +62,26 @@ function mapApp(row: Record<string, unknown>): StudentApplication {
 function mapDoc(row: Record<string, unknown>): ApplicationDocument {
   return {
     id: String(row.id),
-    applicationId: String(row.application_id),
-    docType: String(row.doc_type),
-    fileName: String(row.file_name),
-    mimeType: row.mime_type ? String(row.mime_type) : undefined,
-    storagePath: String(row.storage_path),
-    fileSize: Number(row.file_size ?? 0),
-    isBlurry: Boolean(row.is_blurry),
-    createdAt: String(row.created_at),
+    applicationId: String(row.application_id ?? row.applicationId),
+    docType: String(row.doc_type ?? row.docType),
+    fileName: String(row.file_name ?? row.fileName),
+    mimeType: row.mime_type || row.mimeType ? String(row.mime_type ?? row.mimeType) : undefined,
+    storagePath: String(row.storage_path ?? row.storagePath),
+    fileSize: Number(row.file_size ?? row.fileSize ?? 0),
+    isBlurry: Boolean(row.is_blurry ?? row.isBlurry),
+    createdAt: String(row.created_at ?? row.createdAt),
   }
 }
 
 function mapEvent(row: Record<string, unknown>): ApplicationStatusEvent {
   return {
     id: String(row.id),
-    applicationId: String(row.application_id),
-    fromStatus: row.from_status ? String(row.from_status) : undefined,
-    toStatus: String(row.to_status),
+    applicationId: String(row.application_id ?? row.applicationId),
+    fromStatus: row.from_status || row.fromStatus ? String(row.from_status ?? row.fromStatus) : undefined,
+    toStatus: String(row.to_status ?? row.toStatus),
     note: row.note ? String(row.note) : undefined,
-    actorId: row.actor_id ? String(row.actor_id) : undefined,
-    createdAt: String(row.created_at),
+    actorId: row.actor_id || row.actorId ? String(row.actor_id ?? row.actorId) : undefined,
+    createdAt: String(row.created_at ?? row.createdAt),
   }
 }
 
@@ -93,6 +98,18 @@ function mapNotif(row: Record<string, unknown>): ApplicationNotification {
     createdAt: String(row.created_at),
     sentAt: row.sent_at ? String(row.sent_at) : undefined,
   }
+}
+
+function applicationFileMime(file: File) {
+  if (file.type) return file.type
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  if (extension === 'pdf') return 'application/pdf'
+  if (extension === 'doc') return 'application/msword'
+  if (extension === 'docx') {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  }
+  if (extension === 'png') return 'image/png'
+  return 'image/jpeg'
 }
 
 export type ApplicationFormPayload = Partial<{
@@ -116,6 +133,7 @@ export type ApplicationFormPayload = Partial<{
   parent_whatsapp: string
   parent_email: string
   parent_occupation: string
+  parent_residential_address: string
   emergency_contact: string
   medical_aid: string
   medical_conditions: string
@@ -134,21 +152,18 @@ async function resolveSchoolId(): Promise<string> {
   return String(info.id)
 }
 
-async function queueNotifications(
-  application: StudentApplication,
-  kind: 'submitted' | 'status',
-  extraNote?: string,
-) {
-  const sb = requireSupabase()
-  await sb.rpc('queue_application_notifications', {
-    p_application_id: application.id,
-    p_kind: kind,
-    p_extra_note: extraNote || null,
-  })
-}
-
 export const applicationsApi = {
   async listApplications(): Promise<StudentApplication[]> {
+    const sb = requireSupabase()
+    const { data, error } = await sb
+      .from('student_applications')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return (data ?? []).map((r) => mapApp(r as Record<string, unknown>))
+  },
+
+  async listMyApplications(): Promise<StudentApplication[]> {
     const sb = requireSupabase()
     const { data, error } = await sb
       .from('student_applications')
@@ -261,23 +276,40 @@ export const applicationsApi = {
     if (error) throw error
     const result = data as { ok?: boolean; application?: Record<string, unknown>; error?: string }
     if (!result?.ok || !result.application) throw new Error(result?.error || 'Submit failed')
-
-    const submitted = mapApp(result.application)
-    await queueNotifications(submitted, 'submitted')
-    return submitted
+    return mapApp(result.application)
   },
 
   async trackById(id: string, accessCode: string) {
     const sb = requireSupabase()
-    // Reuse track RPC via number lookup first — fall back to secure document list + draft save proof
-    const { data: draft } = await sb.rpc('save_student_application_draft', {
-      p_id: id,
-      p_access_code: accessCode,
-      p_payload: {},
-    })
-    const draftResult = draft as { ok?: boolean; application?: Record<string, unknown>; error?: string }
-    if (!draftResult?.ok || !draftResult.application) throw new Error(draftResult?.error || 'Not found')
-    const application = mapApp(draftResult.application)
+    let { data: applicationData, error: applicationError } = await sb.rpc(
+      'get_student_application_by_credentials',
+      {
+        p_id: id,
+        p_access_code: accessCode,
+      },
+    )
+
+    // Backward compatibility while the forward migration is being deployed.
+    if (applicationError?.code === 'PGRST202' || applicationError?.code === '42883') {
+      const legacy = await sb.rpc('save_student_application_draft', {
+        p_id: id,
+        p_access_code: accessCode,
+        p_payload: {},
+      })
+      applicationData = legacy.data
+      applicationError = legacy.error
+    }
+    if (applicationError) throw applicationError
+    const applicationResult = applicationData as {
+      ok?: boolean
+      application?: Record<string, unknown>
+      error?: string
+    }
+    if (!applicationResult?.ok || !applicationResult.application) {
+      throw new Error(applicationResult?.error || 'Not found')
+    }
+    const application = mapApp(applicationResult.application)
+
     const { data: docsData, error: docsErr } = await sb.rpc('list_application_documents_secure', {
       p_application_id: id,
       p_access_code: accessCode,
@@ -285,22 +317,12 @@ export const applicationsApi = {
     if (docsErr) throw docsErr
     const docsResult = docsData as { ok?: boolean; documents?: Array<Record<string, unknown>>; error?: string }
     if (!docsResult?.ok) throw new Error(docsResult?.error || 'Could not load documents')
-    const documents = (docsResult.documents ?? []).map((r) =>
-      mapDoc({
-        ...r,
-        application_id: r.application_id ?? r.applicationId,
-        doc_type: r.doc_type ?? r.docType,
-        file_name: r.file_name ?? r.fileName,
-        mime_type: r.mime_type ?? r.mimeType,
-        storage_path: r.storage_path ?? r.storagePath,
-        file_size: r.file_size ?? r.fileSize,
-        is_blurry: r.is_blurry ?? r.isBlurry,
-        created_at: r.created_at ?? r.createdAt,
-      }),
-    )
-    for (const d of documents) {
-      const { data: signed } = await sb.storage.from('admissions-docs').createSignedUrl(d.storagePath, 60 * 60)
-      d.signedUrl = signed?.signedUrl
+    const documents = (docsResult.documents ?? []).map(mapDoc)
+    for (const document of documents) {
+      const { data: signed } = await sb.storage
+        .from('admissions-docs')
+        .createSignedUrl(document.storagePath, 60 * 60)
+      document.signedUrl = signed?.signedUrl
     }
     return { application, documents }
   },
@@ -322,9 +344,11 @@ export const applicationsApi = {
     if (!result?.ok || !result.application) throw new Error(result?.error || 'Not found')
     const application = mapApp(result.application)
     const documents = (result.documents ?? []).map(mapDoc)
-    for (const d of documents) {
-      const { data: signed } = await sb.storage.from('admissions-docs').createSignedUrl(d.storagePath, 60 * 60)
-      d.signedUrl = signed?.signedUrl
+    for (const document of documents) {
+      const { data: signed } = await sb.storage
+        .from('admissions-docs')
+        .createSignedUrl(document.storagePath, 60 * 60)
+      document.signedUrl = signed?.signedUrl
     }
     return {
       application,
@@ -336,6 +360,7 @@ export const applicationsApi = {
   async uploadDocument(input: {
     applicationId: string
     accessCode: string
+    storageToken: string
     docType: string
     file: File
     onProgress?: (pct: number) => void
@@ -345,11 +370,13 @@ export const applicationsApi = {
     const isBlurry = await detectImageBlur(input.file)
     input.onProgress?.(25)
 
+    if (!input.storageToken) throw new Error('This draft needs to be refreshed before uploading documents')
     const safeName = input.file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const path = `${input.applicationId}/${input.docType}/${Date.now()}_${safeName}`
+    const mimeType = applicationFileMime(input.file)
+    const path = `${input.applicationId}/${input.storageToken}/${input.docType}/${Date.now()}_${safeName}`
     const { error: upErr } = await sb.storage.from('admissions-docs').upload(path, input.file, {
-      upsert: true,
-      contentType: input.file.type || undefined,
+      upsert: false,
+      contentType: mimeType,
     })
     if (upErr) throw upErr
     input.onProgress?.(80)
@@ -359,14 +386,20 @@ export const applicationsApi = {
       p_access_code: input.accessCode,
       p_doc_type: input.docType,
       p_file_name: input.file.name,
-      p_mime_type: input.file.type || null,
+      p_mime_type: mimeType,
       p_storage_path: path,
       p_file_size: input.file.size,
       p_is_blurry: isBlurry,
     })
-    if (error) throw error
+    if (error) {
+      await sb.storage.from('admissions-docs').remove([path])
+      throw error
+    }
     const result = data as { ok?: boolean; document?: Record<string, unknown>; error?: string }
-    if (!result?.ok || !result.document) throw new Error(result?.error || 'Upload metadata failed')
+    if (!result?.ok || !result.document) {
+      await sb.storage.from('admissions-docs').remove([path])
+      throw new Error(result?.error || 'Upload metadata failed')
+    }
     input.onProgress?.(100)
 
     const doc = mapDoc(result.document)
@@ -383,9 +416,9 @@ export const applicationsApi = {
       p_access_code: accessCode,
     })
     if (error) throw error
-    const result = data as { ok?: boolean; storagePath?: string; error?: string }
+    const result = data as { ok?: boolean; storagePath?: string; storageDeleted?: boolean; error?: string }
     if (!result?.ok) throw new Error(result?.error || 'Delete failed')
-    if (result.storagePath) {
+    if (result.storagePath && !result.storageDeleted) {
       await sb.storage.from('admissions-docs').remove([result.storagePath])
     }
   },
@@ -399,41 +432,18 @@ export const applicationsApi = {
     actorId?: string
   }): Promise<StudentApplication> {
     const sb = requireSupabase()
-    const { data: existing, error: getErr } = await sb
-      .from('student_applications')
-      .select('*')
-      .eq('id', input.id)
-      .single()
-    if (getErr) throw getErr
-    const prev = mapApp(existing as Record<string, unknown>)
-
-    const { data, error } = await sb
-      .from('student_applications')
-      .update({
-        status: input.status,
-        is_draft: input.status === 'draft',
-        admin_notes: input.adminNotes ?? prev.adminNotes ?? null,
-        missing_documents_note: input.missingDocumentsNote ?? prev.missingDocumentsNote ?? null,
-        reviewed_by: input.actorId || null,
-        reviewed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', input.id)
-      .select('*')
-      .single()
-    if (error) throw error
-
-    await sb.from('application_status_events').insert({
-      application_id: input.id,
-      from_status: prev.status,
-      to_status: input.status,
-      note: input.note || input.missingDocumentsNote || null,
-      actor_id: input.actorId || null,
+    const { data, error } = await sb.rpc('admin_update_student_application_status', {
+      p_id: input.id,
+      p_status: input.status,
+      p_note: input.note || null,
+      p_missing_documents_note: input.missingDocumentsNote || null,
+      p_admin_notes: input.adminNotes || null,
+      p_actor_id: input.actorId || null,
     })
-
-    const updated = mapApp(data as Record<string, unknown>)
-    await queueNotifications(updated, 'status', input.note || input.missingDocumentsNote)
-    return updated
+    if (error) throw error
+    const result = data as { ok?: boolean; application?: Record<string, unknown>; error?: string }
+    if (!result?.ok || !result.application) throw new Error(result?.error || 'Update failed')
+    return mapApp(result.application)
   },
 
   async downloadDocumentBlob(storagePath: string) {

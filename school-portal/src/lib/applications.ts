@@ -21,6 +21,7 @@ export const APPLICATION_DOC_TYPES: Array<{
 
 export const APPLICATION_STATUSES: Array<{ id: StudentApplicationStatus; label: string }> = [
   { id: 'draft', label: 'Draft' },
+  { id: 'submitted', label: 'Submitted' },
   { id: 'pending', label: 'Pending' },
   { id: 'under_review', label: 'Under Review' },
   { id: 'approved', label: 'Approved' },
@@ -258,6 +259,39 @@ export function uiText(locale: string, key: string) {
 
 export function statusLabel(status: StudentApplicationStatus) {
   return APPLICATION_STATUSES.find((s) => s.id === status)?.label || status
+}
+
+export const MAX_APPLICATION_FILE_BYTES = 15 * 1024 * 1024
+
+const ALLOWED_APPLICATION_FILE_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'])
+const ALLOWED_APPLICATION_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
+])
+
+export function validateApplicationFile(file: File): string | null {
+  const extension = file.name.split('.').pop()?.toLowerCase() || ''
+  const supportedType =
+    ALLOWED_APPLICATION_FILE_EXTENSIONS.has(extension) &&
+    (!file.type || ALLOWED_APPLICATION_MIME_TYPES.has(file.type))
+
+  if (!supportedType) {
+    return `${file.name} is not supported. Upload PDF, DOC, DOCX, JPG, or PNG files.`
+  }
+  if (file.size <= 0) return `${file.name} is empty.`
+  if (file.size > MAX_APPLICATION_FILE_BYTES) {
+    return `${file.name} is larger than the 15 MB limit.`
+  }
+  return null
+}
+
+export function formatApplicationFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 /** Rough blur detection for photos (variance of greyscale luminance). */
