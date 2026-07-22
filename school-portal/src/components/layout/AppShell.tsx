@@ -46,6 +46,7 @@ function navForRole(role: UserRole): NavItem[] {
     case 'student':
       return [
         { to: '/student', label: 'Dashboard', icon: icon(<LayoutDashboard className="h-4 w-4" />) },
+        { to: '/student/applications', label: 'Applications', icon: icon(<ClipboardPen className="h-4 w-4" />) },
         { to: '/student/profile', label: 'Profile', icon: icon(<UserCircle className="h-4 w-4" />) },
         { to: '/student/timetable', label: 'Timetable', icon: icon(<Clock className="h-4 w-4" />) },
         { to: '/student/attendance', label: 'Attendance', icon: icon(<ClipboardList className="h-4 w-4" />) },
@@ -54,7 +55,6 @@ function navForRole(role: UserRole): NavItem[] {
         { to: '/student/marks', label: 'Marks', icon: icon(<FileText className="h-4 w-4" />) },
         { to: '/student/exams', label: 'Exam Results', icon: icon(<FileText className="h-4 w-4" />) },
         { to: '/student/ai-tutor', label: 'AI Assistant', icon: icon(<Bot className="h-4 w-4" />) },
-        { to: '/student/applications', label: 'Applications', icon: icon(<ClipboardPen className="h-4 w-4" />) },
         { to: '/student/messages', label: 'Messages', icon: icon(<MessageSquare className="h-4 w-4" />) },
         { to: '/student/fees', label: 'Fees', icon: icon(<CreditCard className="h-4 w-4" />) },
         { to: '/student/announcements', label: 'Announcements', icon: icon(<Megaphone className="h-4 w-4" />) },
@@ -64,12 +64,12 @@ function navForRole(role: UserRole): NavItem[] {
     case 'parent':
       return [
         { to: '/parent', label: 'Dashboard', icon: icon(<LayoutDashboard className="h-4 w-4" />) },
+        { to: '/parent/applications', label: 'Applications', icon: icon(<ClipboardPen className="h-4 w-4" />) },
         { to: '/parent/child', label: 'Child Profile', icon: icon(<UserCircle className="h-4 w-4" />) },
         { to: '/parent/attendance', label: 'Attendance', icon: icon(<ClipboardList className="h-4 w-4" />) },
         { to: '/parent/marks', label: 'Marks', icon: icon(<FileText className="h-4 w-4" />) },
         { to: '/parent/timetable', label: 'Timetable', icon: icon(<Clock className="h-4 w-4" />) },
         { to: '/parent/fees', label: 'School Fees', icon: icon(<CreditCard className="h-4 w-4" />) },
-        { to: '/parent/applications', label: 'Applications', icon: icon(<ClipboardPen className="h-4 w-4" />) },
         { to: '/parent/messages', label: 'Messages', icon: icon(<MessageSquare className="h-4 w-4" />) },
         { to: '/parent/announcements', label: 'Announcements', icon: icon(<Megaphone className="h-4 w-4" />) },
         { to: '/parent/calendar', label: 'Calendar', icon: icon(<Calendar className="h-4 w-4" />) },
@@ -93,6 +93,7 @@ function navForRole(role: UserRole): NavItem[] {
     case 'school_admin':
       return [
         { to: '/admin', label: 'Dashboard', icon: icon(<LayoutDashboard className="h-4 w-4" />) },
+        { to: '/admin/applications', label: 'Applications', icon: icon(<ClipboardPen className="h-4 w-4" />) },
         { to: '/admin/students', label: 'Students', icon: icon(<GraduationCap className="h-4 w-4" />) },
         { to: '/admin/teachers', label: 'Teachers', icon: icon(<Users className="h-4 w-4" />) },
         { to: '/admin/parents', label: 'Parents', icon: icon(<Users className="h-4 w-4" />) },
@@ -101,7 +102,6 @@ function navForRole(role: UserRole): NavItem[] {
         { to: '/admin/classes', label: 'Classes', icon: icon(<School className="h-4 w-4" />) },
         { to: '/admin/timetable', label: 'Timetable', icon: icon(<Clock className="h-4 w-4" />) },
         { to: '/admin/admissions', label: 'Admissions', icon: icon(<ClipboardList className="h-4 w-4" />) },
-        { to: '/admin/applications', label: 'Applications', icon: icon(<ClipboardPen className="h-4 w-4" />) },
         { to: '/admin/announcements', label: 'Announcements', icon: icon(<Megaphone className="h-4 w-4" />) },
         { to: '/admin/whatsapp', label: 'WhatsApp & AI', icon: icon(<Smartphone className="h-4 w-4" />) },
         { to: '/admin/messages', label: 'Messages', icon: icon(<MessageSquare className="h-4 w-4" />) },

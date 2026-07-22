@@ -1,68 +1,97 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { ClipboardList, Search, Sparkles } from 'lucide-react'
+import { applicationsApi } from '@/services/applications-api'
+import {
+  ApplicationSuccess,
+  StudentApplicationWizard,
+} from '@/pages/public/StudentApplicationWizard'
+import { TrackApplicationPage } from '@/pages/public/TrackApplicationPage'
 import { PageHeader, Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/auth-context'
+import type { StudentApplication } from '@/types'
 
-/** In-portal hub so students/parents can open Applications from the sidebar. */
+type Tab = 'apply' | 'track'
+
+/** Full Student Applications module inside the school portal shell. */
 export function ApplicationsHubPage() {
   const { user } = useAuth()
+  const [tab, setTab] = useState<Tab>('apply')
+  const [schoolName, setSchoolName] = useState('School')
+  const [submitted, setSubmitted] = useState<StudentApplication | null>(null)
+
+  useEffect(() => {
+    void applicationsApi.getSchoolName().then(setSchoolName)
+  }, [])
+
   const isParent = user?.profile.role === 'parent'
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 animate-fade-in pb-8">
+    <div className="space-y-4 animate-fade-in pb-10">
       <PageHeader
-        title="Applications"
+        title="Student Applications"
         description={
           isParent
-            ? 'Apply for a new or returning learner, or track an existing application'
-            : 'Start or track a school application'
+            ? 'New learner applications and returning registrations — apply, upload documents, and track status'
+            : 'Apply online or track your school application status'
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="border-sky-200 bg-gradient-to-br from-sky-50 to-white shadow-sm">
-          <CardContent className="space-y-3 p-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-600 text-white">
-              <ClipboardList className="h-5 w-5" />
-            </div>
-            <h2 className="text-lg font-semibold text-sky-950">New application</h2>
-            <p className="text-sm text-slate-600">
-              New student or returning registration — personal details, parent info, medical form, and document uploads.
-            </p>
-            <Link to="/apply">
-              <Button className="w-full sm:w-auto">Start application</Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50 to-white shadow-sm">
-          <CardContent className="space-y-3 p-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-white">
-              <Search className="h-5 w-5" />
-            </div>
-            <h2 className="text-lg font-semibold text-indigo-950">Track status</h2>
-            <p className="text-sm text-slate-600">
-              Enter your application number and access code to see Pending, Under Review, Approved, and more.
-            </p>
-            <Link to="/apply/track">
-              <Button variant="outline" className="w-full sm:w-auto">
-                Track application
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        <Button
+          type="button"
+          variant={tab === 'apply' ? 'default' : 'outline'}
+          className={cn(tab === 'apply' && 'bg-sky-600 hover:bg-sky-700')}
+          onClick={() => {
+            setTab('apply')
+            setSubmitted(null)
+          }}
+        >
+          <ClipboardList className="mr-1.5 h-4 w-4" />
+          Apply now
+        </Button>
+        <Button
+          type="button"
+          variant={tab === 'track' ? 'default' : 'outline'}
+          className={cn(tab === 'track' && 'bg-sky-600 hover:bg-sky-700')}
+          onClick={() => setTab('track')}
+        >
+          <Search className="mr-1.5 h-4 w-4" />
+          Track status
+        </Button>
       </div>
 
-      <Card>
-        <CardContent className="flex items-start gap-3 p-5 text-sm text-muted-foreground">
+      <Card className="border-sky-100 bg-sky-50/50">
+        <CardContent className="flex items-start gap-3 p-4 text-sm text-slate-700">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
           <p>
-            Need help filling the form? Open an application and use the <strong>Ask AI for help</strong> button — it can
-            explain every field and translate into all 12 official South African languages.
+            Complete personal, parent/guardian and medical details, upload birth certificate, ID, reports and more.
+            Use <strong>Ask AI for help</strong> on the form for explanations and translation into all 12 official
+            languages. Status updates notify parents by email, WhatsApp and SMS.
           </p>
         </CardContent>
       </Card>
+
+      {tab === 'apply' ? (
+        submitted ? (
+          <div className="space-y-4">
+            <ApplicationSuccess app={submitted} />
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => setTab('track')}>
+                Track this application
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setSubmitted(null)}>
+                Start another
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <StudentApplicationWizard schoolName={schoolName} onSubmitted={setSubmitted} />
+        )
+      ) : (
+        <TrackApplicationPage embedded />
+      )}
     </div>
   )
 }

@@ -7,10 +7,10 @@ import { statusLabel } from '@/lib/applications'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, cn } from '@/lib/utils'
 import type { ApplicationDocument, ApplicationStatusEvent, StudentApplication } from '@/types'
 
-export function TrackApplicationPage() {
+export function TrackApplicationPage({ embedded = false }: { embedded?: boolean }) {
   const [number, setNumber] = useState('')
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
@@ -35,17 +35,25 @@ export function TrackApplicationPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-sky-50 via-white to-slate-50 px-4 py-8">
-      <div className="mx-auto mb-6 flex max-w-xl items-center justify-between">
-        <Link to="/apply" className="text-sm font-medium text-sky-700 hover:underline">
-          ← Apply online
-        </Link>
-        <Link to="/login" className="text-sm text-slate-500 hover:underline">
-          Sign in
-        </Link>
-      </div>
+    <div
+      className={
+        embedded
+          ? 'space-y-4'
+          : 'min-h-dvh bg-gradient-to-b from-sky-50 via-white to-slate-50 px-4 py-8'
+      }
+    >
+      {!embedded ? (
+        <div className="mx-auto mb-6 flex max-w-xl items-center justify-between">
+          <Link to="/apply" className="text-sm font-medium text-sky-700 hover:underline">
+            ← Apply online
+          </Link>
+          <Link to="/login" className="text-sm text-slate-500 hover:underline">
+            Sign in
+          </Link>
+        </div>
+      ) : null}
 
-      <Card className="mx-auto max-w-xl border-sky-100 shadow-md">
+      <Card className={cn('border-sky-100 shadow-md', !embedded && 'mx-auto max-w-xl')}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sky-900">
             <Search className="h-5 w-5" /> Track your application
@@ -79,7 +87,7 @@ export function TrackApplicationPage() {
       </Card>
 
       {app ? (
-        <div className="mx-auto mt-6 max-w-xl space-y-4 animate-fade-in">
+        <div className={cn('mt-6 space-y-4 animate-fade-in', !embedded && 'mx-auto max-w-xl')}>
           <Card className="border-sky-100">
             <CardContent className="space-y-3 p-5">
               <div className="flex flex-wrap items-start justify-between gap-2">

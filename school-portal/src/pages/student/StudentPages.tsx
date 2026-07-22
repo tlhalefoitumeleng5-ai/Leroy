@@ -152,8 +152,8 @@ export function StudentDashboard() {
 
       <QuickLinks
         items={[
+          { to: '/student/applications', label: 'Applications', hint: 'Apply · upload docs · track' },
           { to: '/student/ai-tutor', label: 'AI Assistant', hint: 'ChatGPT-style help' },
-          { to: '/student/applications', label: 'Applications', hint: 'Apply or track status' },
           { to: '/student/homework', label: 'Homework', hint: 'Upload submissions' },
           { to: '/student/messages', label: 'Messages', hint: 'Chat with teachers' },
           { to: '/student/fees', label: 'Fees', hint: 'View invoices' },
