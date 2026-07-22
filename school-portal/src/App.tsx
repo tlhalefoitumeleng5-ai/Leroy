@@ -64,6 +64,7 @@ import {
   SuperUsersPage,
 } from '@/pages/admin/AdminPages'
 import { AdminStudentApplicationsPage } from '@/pages/admin/AdminStudentApplicationsPage'
+import { ApplicationsHubPage } from '@/pages/shared/ApplicationsHubPage'
 import {
   AdminFeesPage,
   AdminWhatsAppPage,
@@ -119,6 +120,7 @@ export default function App() {
             <Route path="/student/messages" element={<MessagingPage />} />
             <Route path="/student/fees" element={<StudentFeesPage />} />
             <Route path="/student/ai-tutor" element={<StudentAiTutorPage />} />
+            <Route path="/student/applications" element={<ApplicationsHubPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={['parent']} />}>
@@ -133,6 +135,7 @@ export default function App() {
             <Route path="/parent/forum" element={<ParentForumPage />} />
             <Route path="/parent/fees" element={<ParentFeesPage />} />
             <Route path="/parent/messages" element={<MessagingPage />} />
+            <Route path="/parent/applications" element={<ApplicationsHubPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={['teacher']} />}>
