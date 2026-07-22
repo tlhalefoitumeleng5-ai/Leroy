@@ -5,15 +5,12 @@ import {
   ApplicationSuccess,
   StudentApplicationWizard,
 } from '@/pages/public/StudentApplicationWizard'
-import {
-  ApplicationHomePage,
-  readSavedApplicationDraftSummary,
-} from '@/pages/public/ApplicationHomePage'
+import { ApplicationHomePage } from '@/pages/public/ApplicationHomePage'
 import { TrackApplicationPage } from '@/pages/public/TrackApplicationPage'
 import { PageHeader, Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { DRAFT_STORAGE_KEY } from '@/lib/applications'
+import { DRAFT_STORAGE_KEY, readSavedApplicationDraftSummary } from '@/lib/applications'
 import { useAuth } from '@/contexts/auth-context'
 import type { ApplicationDocument, StudentApplication, StudentApplicationType } from '@/types'
 

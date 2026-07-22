@@ -1,33 +1,8 @@
 import { ClipboardCheck, FileClock, RefreshCw, UserPlus } from 'lucide-react'
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { DRAFT_STORAGE_KEY, statusLabel } from '@/lib/applications'
+import { statusLabel, type SavedApplicationDraftSummary } from '@/lib/applications'
 import type { StudentApplication, StudentApplicationType } from '@/types'
-
-export interface SavedApplicationDraftSummary {
-  applicationType: StudentApplicationType
-  applicationNumber?: string
-  learnerName?: string
-}
-
-export function readSavedApplicationDraftSummary(): SavedApplicationDraftSummary | null {
-  try {
-    const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
-    if (!raw) return null
-    const saved = JSON.parse(raw) as {
-      form?: { applicationType?: StudentApplicationType; firstName?: string; surname?: string }
-      meta?: { applicationNumber?: string }
-    }
-    if (!saved.form?.applicationType) return null
-    return {
-      applicationType: saved.form.applicationType,
-      applicationNumber: saved.meta?.applicationNumber,
-      learnerName: [saved.form.firstName, saved.form.surname].filter(Boolean).join(' ') || undefined,
-    }
-  } catch {
-    return null
-  }
-}
 
 export function ApplicationHomePage({
   schoolName,

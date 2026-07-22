@@ -6,12 +6,9 @@ import {
   ApplicationSuccess,
   StudentApplicationWizard,
 } from '@/pages/public/StudentApplicationWizard'
-import {
-  ApplicationHomePage,
-  readSavedApplicationDraftSummary,
-} from '@/pages/public/ApplicationHomePage'
+import { ApplicationHomePage } from '@/pages/public/ApplicationHomePage'
 import { Button } from '@/components/ui/button'
-import { DRAFT_STORAGE_KEY } from '@/lib/applications'
+import { DRAFT_STORAGE_KEY, readSavedApplicationDraftSummary } from '@/lib/applications'
 import type { ApplicationDocument, StudentApplication, StudentApplicationType } from '@/types'
 
 type Submission = { application: StudentApplication; documents: ApplicationDocument[] }

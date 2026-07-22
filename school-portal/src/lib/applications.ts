@@ -1,4 +1,4 @@
-import type { ApplicationDocType, StudentApplicationStatus } from '@/types'
+import type { ApplicationDocType, StudentApplicationStatus, StudentApplicationType } from '@/types'
 import { SA_OFFICIAL_LANGUAGES } from '@/lib/caps-tutor'
 
 export const APPLICATION_DOC_TYPES: Array<{
@@ -292,6 +292,31 @@ export function formatApplicationFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export interface SavedApplicationDraftSummary {
+  applicationType: StudentApplicationType
+  applicationNumber?: string
+  learnerName?: string
+}
+
+export function readSavedApplicationDraftSummary(): SavedApplicationDraftSummary | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
+    if (!raw) return null
+    const saved = JSON.parse(raw) as {
+      form?: { applicationType?: StudentApplicationType; firstName?: string; surname?: string }
+      meta?: { applicationNumber?: string }
+    }
+    if (!saved.form?.applicationType) return null
+    return {
+      applicationType: saved.form.applicationType,
+      applicationNumber: saved.meta?.applicationNumber,
+      learnerName: [saved.form.firstName, saved.form.surname].filter(Boolean).join(' ') || undefined,
+    }
+  } catch {
+    return null
+  }
 }
 
 /** Rough blur detection for photos (variance of greyscale luminance). */

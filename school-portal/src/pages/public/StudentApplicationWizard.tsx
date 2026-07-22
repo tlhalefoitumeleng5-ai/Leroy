@@ -346,7 +346,7 @@ export function StudentApplicationWizard({
     void loadDocs(appMeta).catch(() => {
       /* The existing upload list remains available while offline. */
     })
-  }, [step])
+  }, [step, appMeta])
 
   async function handleFiles(fileList: FileList | File[] | null) {
     if (!fileList || fileList.length === 0) return
