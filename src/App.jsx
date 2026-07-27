@@ -5,20 +5,20 @@ import {
   Award,
   Building2,
   Check,
+  Camera,
   ChevronRight,
   CircleCheck,
   ExternalLink,
   Factory,
-  Facebook,
   FileText,
   Gauge,
   HardHat,
-  Instagram,
   LoaderCircle,
   Mail,
   MapPin,
   Menu,
   MessageCircle,
+  MessagesSquare,
   Pause,
   Phone,
   Pickaxe,
@@ -26,7 +26,6 @@ import {
   Send,
   ShieldCheck,
   Sparkles,
-  Truck,
   Users,
   Volume2,
   VolumeX,
@@ -248,8 +247,8 @@ const departments = [
 
 const socialLinks = [
   { label: 'WhatsApp', href: CONTACT.whatsapp, icon: MessageCircle },
-  { label: 'Messenger', href: CONTACT.messenger, icon: Facebook },
-  { label: 'Instagram', href: CONTACT.instagram, icon: Instagram },
+  { label: 'Messenger', href: CONTACT.messenger, icon: MessagesSquare },
+  { label: 'Instagram', href: CONTACT.instagram, icon: Camera },
   { label: 'X direct message', href: CONTACT.x, icon: Send },
 ]
 
@@ -453,7 +452,7 @@ function Hero({ onQuote }) {
             <span>South African mining capability</span>
             <span className="hero__kicker-line" />
           </div>
-          <h1 id="hero-title">
+          <h1 id="hero-title" aria-label="Pioneering modern, sustainable mining & engineering">
             Pioneering modern,
             <span>sustainable mining</span>
             &amp; engineering
@@ -1040,7 +1039,7 @@ function QuoteModal({ open, onClose }) {
   if (!open) return null
   return (
     <div className="modal" role="dialog" aria-modal="true" aria-labelledby="quote-title">
-      <button className="modal__backdrop" aria-label="Close quote form" onClick={onClose} />
+      <button className="modal__backdrop" aria-label="Dismiss quote form" onClick={onClose} />
       <div className="modal__panel">
         <div className="modal__header">
           <div>

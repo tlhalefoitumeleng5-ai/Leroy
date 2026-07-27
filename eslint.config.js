@@ -7,11 +7,10 @@ export default [
   { ignores: ['dist', 'build', '.dart_tool', 'node_modules'] },
   {
     files: ['**/*.{js,jsx}'],
-    extends: [
-      js.configs.recommended,
-      reactHooks.configs.flat.recommended,
-      reactRefresh.configs.vite,
-    ],
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
     languageOptions: {
       ecmaVersion: 'latest',
       globals: {
@@ -25,6 +24,9 @@ export default [
       },
     },
     rules: {
+      ...js.configs.recommended.rules,
+      ...reactHooks.configs.flat.recommended.rules,
+      ...reactRefresh.configs.vite.rules,
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
