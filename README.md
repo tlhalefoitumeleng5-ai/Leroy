@@ -1,4 +1,38 @@
-# Leroy AI
+# Vikela Mining Website + Leroy AI
+
+## Vikela Mining website
+
+Production React website for Vikela Mining (Pty) Ltd, including:
+
+- Responsive corporate marketing experience
+- Interactive service hub, media gallery and video lightbox
+- Quote modal and departmental contact inquiry forms
+- WhatsApp, phone, email and direct-message integrations
+- Embedded Rustenburg location map
+- Semantic HTML, reduced-motion support and keyboard-accessible dialogs
+
+### Run the website
+
+```bash
+npm install
+npm run dev
+```
+
+### Validate the website
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+The inquiry form uses FormSubmit to deliver requests to
+`Admin@vikelamining.co.za`. FormSubmit may send a one-time activation email to
+that mailbox the first time the endpoint is used. If the service is
+unavailable, the website opens the visitor's email client with the inquiry
+pre-filled.
+
+## Leroy AI mobile application
 
 Premium Flutter Android app for AI chat, image generation, and prompt management.
 
