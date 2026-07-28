@@ -1,9 +1,6 @@
 name: Deploy Vikela Mining Website
 
 on:
-  push:
-    branches:
-      - Leroyvikela-mining-website-8e31
   workflow_dispatch:
 
 permissions:
