@@ -1224,7 +1224,7 @@ function Lightbox({ item, onClose }) {
   if (!item || !activeItem) return null
   return (
     <div className="lightbox" role="dialog" aria-modal="true" aria-label={activeItem.title}>
-      <button className="lightbox__backdrop" onClick={onClose} aria-label="Close gallery item" />
+      <button className="lightbox__backdrop" onClick={onClose} aria-label="Dismiss gallery item" />
       <div className={`lightbox__panel ${activeItem.type === 'video' ? 'lightbox__panel--video' : ''}`}>
         <button className="lightbox__close" onClick={onClose} aria-label="Close gallery item">
           <X size={22} />
