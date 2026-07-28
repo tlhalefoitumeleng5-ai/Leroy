@@ -49,6 +49,35 @@ describe('Vikela Mining website', () => {
     expect(screen.queryByRole('button', { name: /open coordinated material movement/i })).not.toBeInTheDocument()
   })
 
+  it('provides four related mining videos and navigable project albums', () => {
+    const { container } = render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /play machines below ground/i }))
+    let dialog = screen.getByRole('dialog', { name: /machines below ground/i })
+    expect(within(dialog).getAllByRole('button', { name: /^play /i })).toHaveLength(4)
+    expect(dialog.querySelector('source')).toHaveAttribute(
+      'src',
+      'https://videos.pexels.com/video-files/31752064/13527815_3840_2160_25fps.mp4',
+    )
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /play fleet in motion/i }))
+    expect(dialog.querySelector('source')).toHaveAttribute(
+      'src',
+      'https://videos.pexels.com/video-files/8382433/8382433-hd_1280_720_30fps.mp4',
+    )
+    fireEvent.click(within(dialog).getByRole('button', { name: /close gallery item/i }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Steel Fabrication' }))
+    fireEvent.click(screen.getByRole('button', { name: /open precision fabrication/i }))
+    dialog = screen.getByRole('dialog', { name: /precision fabrication/i })
+    expect(within(dialog).getByAltText(/industrial worker welding steel beams/i)).toBeInTheDocument()
+    expect(within(dialog).getAllByRole('button', { name: /^view image/i })).toHaveLength(4)
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /next album image/i }))
+    expect(within(dialog).getByAltText(/worker in a hard hat welding metal components/i)).toBeInTheDocument()
+    expect(container).not.toHaveTextContent('Heavy equipment readiness')
+  })
+
   it('sends a validated contact inquiry through the configured service', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,

@@ -6,6 +6,7 @@ import {
   Building2,
   Check,
   Camera,
+  ChevronLeft,
   ChevronRight,
   CircleCheck,
   ExternalLink,
@@ -13,6 +14,7 @@ import {
   FileText,
   Gauge,
   HardHat,
+  Images,
   LoaderCircle,
   Mail,
   MapPin,
@@ -142,71 +144,156 @@ const safetyPoints = [
   },
 ]
 
+const pexelsPhoto = (id, width = 1600) =>
+  `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=${width}`
+
+const videoShowcase = [
+  {
+    id: 'video-underground',
+    type: 'video',
+    category: 'Underground Operations',
+    title: 'Machines below ground',
+    caption: 'Heavy machinery advancing underground tunnel infrastructure in demanding conditions.',
+    image: pexelsPhoto(5089723),
+    video: 'https://videos.pexels.com/video-files/31752064/13527815_3840_2160_25fps.mp4',
+    duration: 'Field reel 01',
+  },
+  {
+    id: 'video-open-pit',
+    type: 'video',
+    category: 'Mining Operations',
+    title: 'Open-pit production',
+    caption: 'Aerial perspective on coordinated extraction, loading and active mine-site production.',
+    image: pexelsPhoto(5505961),
+    video: 'https://videos.pexels.com/video-files/17627281/17627281-hd_1920_1080_24fps.mp4',
+    duration: 'Field reel 02',
+  },
+  {
+    id: 'video-fleet',
+    type: 'video',
+    category: 'Logistics Fleet',
+    title: 'Fleet in motion',
+    caption: 'Haul trucks and excavators moving material through a working extraction site.',
+    image: pexelsPhoto(33774180),
+    video: 'https://videos.pexels.com/video-files/8382433/8382433-hd_1280_720_30fps.mp4',
+    duration: 'Field reel 03',
+  },
+  {
+    id: 'video-miner',
+    type: 'video',
+    category: 'People at Work',
+    title: 'The people behind production',
+    caption: 'A miner at work—skill, endurance and human capability at the centre of every operation.',
+    image: pexelsPhoto(12057331),
+    video: 'https://videos.pexels.com/video-files/26736390/11996810_1920_1080_25fps.mp4',
+    duration: 'Field reel 04',
+  },
+]
+
 const galleryItems = [
   {
     id: 1,
     category: 'Underground Operations',
-    title: 'Underground development',
-    caption: 'Development cycles built around disciplined planning and safe production.',
-    image:
-      'https://images.unsplash.com/photo-1578319439584-104c94d37305?auto=format&fit=crop&w=1200&q=84',
-    type: 'video',
+    title: 'Underground crews',
+    caption: 'The people, protective systems and disciplined teamwork behind safe underground progress.',
+    image: pexelsPhoto(17839774),
+    images: [
+      { src: pexelsPhoto(17839774), alt: 'Coal miner in a hard hat working among rock' },
+      { src: pexelsPhoto(12057331), alt: 'Underground mine worker carrying timber support' },
+      { src: pexelsPhoto(5089723), alt: 'Woman mine professional walking through an industrial tunnel' },
+      { src: pexelsPhoto(37923718), alt: 'Industrial workers operating machinery in a quarry' },
+    ],
   },
   {
     id: 2,
     category: 'Engineering & Equipment',
-    title: 'Heavy equipment readiness',
-    caption: 'Reliable plant and fit-for-purpose equipment for demanding operating conditions.',
-    image:
-      'https://images.unsplash.com/photo-1581094794329-c8112a89af12?auto=format&fit=crop&w=1200&q=84',
+    title: 'Heavy equipment at work',
+    caption: 'Real extraction machinery, haulage assets and earthmoving capability in active environments.',
+    image: pexelsPhoto(29506742),
+    images: [
+      { src: pexelsPhoto(29506742), alt: 'Excavator loading a mining truck in a quarry' },
+      { src: pexelsPhoto(5505961), alt: 'Bucket-wheel excavator in an open-pit mine' },
+      { src: pexelsPhoto(33774180), alt: 'Massive mining truck in an open-pit quarry' },
+      { src: pexelsPhoto(14484386), alt: 'Heavy mining equipment and conveyors on site' },
+    ],
   },
   {
     id: 3,
     category: 'Steel Fabrication',
     title: 'Precision fabrication',
-    caption: 'Robust components fabricated to meet site requirements and operating loads.',
-    image:
-      'https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&w=1200&q=84',
+    caption: 'Skilled fabricators building robust steel systems with precision and full protective equipment.',
+    image: pexelsPhoto(37785354),
+    images: [
+      { src: pexelsPhoto(37785354), alt: 'Industrial worker welding steel beams with sparks flying' },
+      { src: pexelsPhoto(4956912), alt: 'Worker in a hard hat welding metal components' },
+      { src: pexelsPhoto(32467386), alt: 'Construction workers welding structural steel outdoors' },
+      { src: pexelsPhoto(37785356), alt: 'Skilled metalworker welding in protective equipment' },
+    ],
   },
   {
     id: 4,
     category: 'Logistics Fleet',
     title: 'Coordinated material movement',
     caption: 'Planned routes, reliable loading and disciplined fleet execution.',
-    image:
-      'https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=1200&q=84',
+    image: pexelsPhoto(33774180),
+    images: [
+      { src: pexelsPhoto(33774180), alt: 'Mining haul truck moving through an open-pit quarry' },
+      { src: pexelsPhoto(29506742), alt: 'Excavator loading material into a haul truck' },
+      { src: pexelsPhoto(14484386), alt: 'Mining fleet and conveyor equipment on a production road' },
+      { src: pexelsPhoto(37923718), alt: 'Quarry team coordinating machinery operations' },
+    ],
   },
   {
     id: 5,
-    category: 'Engineering & Equipment',
-    title: 'Mechanical capability',
-    caption: 'Integrated maintenance and engineering support that keeps operations moving.',
-    image:
-      'https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=84',
+    category: 'People & Leadership',
+    title: 'Women shaping industry',
+    caption: 'Representative images of women professionals bringing technical leadership to the field.',
+    image: pexelsPhoto(8487787),
+    images: [
+      { src: pexelsPhoto(8487787), alt: 'Black woman engineer wearing a hard hat and reflective vest' },
+      { src: pexelsPhoto(11174201), alt: 'African woman engineer reviewing technical plans outdoors' },
+      { src: pexelsPhoto(36574302), alt: 'Diverse engineering team collaborating with a tablet on site' },
+      { src: pexelsPhoto(5089723), alt: 'Woman professional inspecting an underground tunnel' },
+    ],
   },
   {
     id: 6,
-    category: 'Underground Operations',
-    title: 'Ground support systems',
-    caption: 'Practical reinforcement and support solutions for controlled underground access.',
-    image:
-      'https://images.unsplash.com/photo-1574689049868-e94ed5301745?auto=format&fit=crop&w=1200&q=84',
+    category: 'People & Leadership',
+    title: 'Leadership in the field',
+    caption: 'Representative executives and engineers aligning people, plans and safe delivery.',
+    image: pexelsPhoto(37198880),
+    images: [
+      { src: pexelsPhoto(37198880), alt: 'African engineering leaders reviewing construction plans' },
+      { src: pexelsPhoto(37198882), alt: 'Diverse technical leadership team discussing blueprints' },
+      { src: pexelsPhoto(36574302), alt: 'Field leadership team collaborating at an industrial site' },
+      { src: pexelsPhoto(8487787), alt: 'Woman engineering leader in full protective equipment' },
+    ],
   },
   {
     id: 7,
-    category: 'Steel Fabrication',
-    title: 'Conveyor infrastructure',
-    caption: 'Fabricated transfer systems designed for efficient materials handling.',
-    image:
-      'https://images.unsplash.com/photo-1565610222536-ef125c59da2e?auto=format&fit=crop&w=1200&q=84',
+    category: 'Engineering & Equipment',
+    title: 'Extraction systems',
+    caption: 'Large-scale systems that connect excavation, loading, conveyance and production flow.',
+    image: pexelsPhoto(5505961),
+    images: [
+      { src: pexelsPhoto(5505961), alt: 'Large bucket-wheel excavator operating in an open-pit mine' },
+      { src: pexelsPhoto(14484386), alt: 'Mining conveyor and heavy equipment infrastructure' },
+      { src: pexelsPhoto(29506742), alt: 'Loading systems operating inside a quarry' },
+      { src: pexelsPhoto(33774180), alt: 'Large-capacity mining truck ready for haulage' },
+    ],
   },
   {
     id: 8,
-    category: 'Logistics Fleet',
-    title: 'Operational coordination',
-    caption: 'Clear communication from dispatch through delivery and site handover.',
-    image:
-      'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=84',
+    category: 'People & Leadership',
+    title: 'One team, one standard',
+    caption: 'Collaborative planning, field communication and shared responsibility for delivery.',
+    image: pexelsPhoto(36574302),
+    images: [
+      { src: pexelsPhoto(36574302), alt: 'Diverse industrial team collaborating outdoors' },
+      { src: pexelsPhoto(37198882), alt: 'Engineers coordinating work over project plans' },
+      { src: pexelsPhoto(37923718), alt: 'Workers coordinating equipment in a quarry environment' },
+      { src: pexelsPhoto(12057331), alt: 'Mine worker demonstrating strength and practical skill underground' },
+    ],
   },
 ]
 
@@ -216,6 +303,7 @@ const galleryFilters = [
   'Engineering & Equipment',
   'Steel Fabrication',
   'Logistics Fleet',
+  'People & Leadership',
 ]
 
 const departments = [
@@ -725,10 +813,53 @@ function Gallery({ onOpen }) {
       <div className="shell">
         <div className="gallery__top">
           <SectionHeading
-            eyebrow="Inside the work"
-            title="Capability in motion."
-            body="Explore the environments, equipment and coordinated disciplines behind Vikela Mining delivery."
+            eyebrow="Mining in motion"
+            title="See the work. Meet the people."
+            body="Real mining environments, people and machinery—presented through field reels and immersive project albums."
           />
+          <div className="gallery__media-count">
+            <strong>04</strong>
+            <span>Mining films</span>
+            <strong>32</strong>
+            <span>Project images</span>
+          </div>
+        </div>
+
+        <div className="video-showcase">
+          <div className="video-showcase__heading">
+            <div>
+              <span><Play size={15} fill="currentColor" /> Field reels</span>
+              <h3>Machines, miners and movement.</h3>
+            </div>
+            <p>Tap any film to watch, then continue through all four mining videos inside the player.</p>
+          </div>
+          <div className="video-showcase__grid">
+            {videoShowcase.map((video, index) => (
+              <button
+                className={`video-card ${index === 0 ? 'video-card--feature' : ''}`}
+                key={video.id}
+                onClick={() => onOpen(video)}
+                aria-label={`Play ${video.title}`}
+              >
+                <img src={video.image} alt="" loading="lazy" />
+                <span className="video-card__shade" />
+                <span className="video-card__tag">{video.category}</span>
+                <span className="video-card__play"><Play size={23} fill="currentColor" /></span>
+                <span className="video-card__content">
+                  <small>{video.duration}</small>
+                  <strong>{video.title}</strong>
+                  <span>Watch film <ArrowRight size={15} /></span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="gallery__album-head">
+          <div>
+            <span><Images size={16} /> Project albums</span>
+            <h3>Explore every angle.</h3>
+          </div>
           <div className="gallery__filters" role="group" aria-label="Filter project gallery">
             {galleryFilters.map((item) => (
               <button
@@ -753,12 +884,10 @@ function Gallery({ onOpen }) {
               <img src={item.image} alt="" loading="lazy" />
               <span className="gallery-card__shade" />
               <span className="gallery-card__category">{item.category}</span>
-              {item.type === 'video' && (
-                <span className="gallery-card__play"><Play size={21} fill="currentColor" /></span>
-              )}
+              <span className="gallery-card__album"><Images size={17} />{item.images.length} photos</span>
               <span className="gallery-card__content">
                 <strong>{item.title}</strong>
-                <span>View project <ArrowRight size={15} /></span>
+                <span>Open album <ArrowRight size={15} /></span>
               </span>
             </button>
           ))}
@@ -1064,10 +1193,25 @@ function QuoteModal({ open, onClose }) {
 }
 
 function Lightbox({ item, onClose }) {
+  const [activeItem, setActiveItem] = useState(item)
+  const [activeImage, setActiveImage] = useState(0)
+
+  const images = activeItem?.images ?? []
+  const moveImage = (direction) => {
+    if (!images.length) return
+    setActiveImage((current) => (current + direction + images.length) % images.length)
+  }
+
   useEffect(() => {
     if (!item) return undefined
     const onKeyDown = (event) => {
       if (event.key === 'Escape') onClose()
+      if (activeItem?.type !== 'video' && images.length && event.key === 'ArrowLeft') {
+        setActiveImage((current) => (current - 1 + images.length) % images.length)
+      }
+      if (activeItem?.type !== 'video' && images.length && event.key === 'ArrowRight') {
+        setActiveImage((current) => (current + 1) % images.length)
+      }
     }
     document.body.classList.add('modal-open')
     document.addEventListener('keydown', onKeyDown)
@@ -1075,33 +1219,88 @@ function Lightbox({ item, onClose }) {
       document.body.classList.remove('modal-open')
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [item, onClose])
+  }, [activeItem, images.length, item, onClose])
 
-  if (!item) return null
+  if (!item || !activeItem) return null
   return (
-    <div className="lightbox" role="dialog" aria-modal="true" aria-label={item.title}>
+    <div className="lightbox" role="dialog" aria-modal="true" aria-label={activeItem.title}>
       <button className="lightbox__backdrop" onClick={onClose} aria-label="Close gallery item" />
-      <div className="lightbox__panel">
+      <div className={`lightbox__panel ${activeItem.type === 'video' ? 'lightbox__panel--video' : ''}`}>
         <button className="lightbox__close" onClick={onClose} aria-label="Close gallery item">
           <X size={22} />
         </button>
         <div className="lightbox__media">
-          {item.type === 'video' ? (
-            <video controls autoPlay playsInline poster={item.image}>
-              <source
-                src="https://videos.pexels.com/video-files/2887463/2887463-hd_1920_1080_25fps.mp4"
-                type="video/mp4"
-              />
+          {activeItem.type === 'video' ? (
+            <video key={activeItem.video} controls autoPlay playsInline poster={activeItem.image}>
+              <source src={activeItem.video} type="video/mp4" />
             </video>
           ) : (
-            <img src={item.image} alt={item.title} />
+            <>
+              <img
+                key={images[activeImage]?.src}
+                src={images[activeImage]?.src}
+                alt={images[activeImage]?.alt ?? activeItem.title}
+              />
+              <button
+                className="lightbox__arrow lightbox__arrow--previous"
+                onClick={() => moveImage(-1)}
+                aria-label="Previous album image"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <button
+                className="lightbox__arrow lightbox__arrow--next"
+                onClick={() => moveImage(1)}
+                aria-label="Next album image"
+              >
+                <ChevronRight size={24} />
+              </button>
+              <span className="lightbox__counter">{activeImage + 1} / {images.length}</span>
+            </>
           )}
         </div>
         <div className="lightbox__caption">
-          <span>{item.category}</span>
-          <h3>{item.title}</h3>
-          <p>{item.caption}</p>
+          <span>{activeItem.category}</span>
+          <h3>{activeItem.title}</h3>
+          <p>{activeItem.caption}</p>
         </div>
+        {activeItem.type === 'video' ? (
+          <div className="lightbox__related">
+            <div className="lightbox__related-heading">
+              <span>Continue watching</span>
+              <small>{videoShowcase.length} mining field reels</small>
+            </div>
+            <div className="lightbox__related-grid">
+              {videoShowcase.map((video) => (
+                <button
+                  key={video.id}
+                  className={activeItem.id === video.id ? 'is-active' : ''}
+                  onClick={() => setActiveItem(video)}
+                  aria-label={`Play ${video.title}`}
+                >
+                  <img src={video.image} alt="" />
+                  <span><Play size={15} fill="currentColor" /></span>
+                  <strong>{video.title}</strong>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="lightbox__thumbnails" role="group" aria-label={`${activeItem.title} album images`}>
+            {images.map((image, index) => (
+              <button
+                key={image.src}
+                className={activeImage === index ? 'is-active' : ''}
+                onClick={() => setActiveImage(index)}
+                aria-label={`View image ${index + 1}: ${image.alt}`}
+                aria-pressed={activeImage === index}
+              >
+                <img src={image.src} alt="" loading="lazy" />
+                <span>{String(index + 1).padStart(2, '0')}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1175,7 +1374,11 @@ function App() {
       <Footer onQuote={() => setQuoteOpen(true)} />
       <FloatingChannels />
       <QuoteModal open={quoteOpen} onClose={() => setQuoteOpen(false)} />
-      <Lightbox item={galleryItem} onClose={() => setGalleryItem(null)} />
+      <Lightbox
+        key={galleryItem?.id ?? 'closed'}
+        item={galleryItem}
+        onClose={() => setGalleryItem(null)}
+      />
     </>
   )
 }
