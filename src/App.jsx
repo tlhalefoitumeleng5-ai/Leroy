@@ -39,9 +39,9 @@ const CONTACT = {
   admin: 'Admin@vikelamining.co.za',
   operations: 'Duduzile@vikelamining.co.za',
   phone: '+27 14 061 0718',
-  mobile: '+27 61 188 36379',
+  mobile: '+27 63 667 0985',
   address: 'House No 46, Boitekong Ext 13, Rustenburg, North West, 0300',
-  whatsapp: 'https://wa.me/276118836379',
+  whatsapp: 'https://wa.me/27636670985',
   messenger: 'https://m.me/YourFacebookPageUsername',
   instagram: 'https://ig.me/m/YourInstagramHandle',
   x: 'https://x.com/messages/compose?recipient_id=YOUR_USER_ID',
@@ -327,7 +327,7 @@ function TopBar() {
             <Phone size={14} />
             <span>{CONTACT.phone}</span>
           </a>
-          <a href="tel:+276118836379" className="topbar__secondary-phone">
+          <a href="tel:+27636670985" className="topbar__secondary-phone">
             <span>{CONTACT.mobile}</span>
           </a>
         </div>
@@ -909,7 +909,7 @@ function Contact() {
           <div className="contact__phone-block">
             <span>Call our team directly</span>
             <a href="tel:+27140610718">{CONTACT.phone}</a>
-            <a href="tel:+276118836379">{CONTACT.mobile}</a>
+            <a href="tel:+27636670985">{CONTACT.mobile}</a>
           </div>
         </div>
         <div className="department-grid">

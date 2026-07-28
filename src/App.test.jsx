@@ -17,6 +17,14 @@ describe('Vikela Mining website', () => {
     expect(screen.getAllByText(/100% black female-owned/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText('Info@Vikelamining.co.za').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Admin@vikelamining.co.za').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('+27 63 667 0985').length).toBeGreaterThan(0)
+    expect(
+      screen
+        .getAllByRole('link')
+        .filter((link) => link.getAttribute('href')?.includes('wa.me'))
+        .every((link) => link.getAttribute('href') === 'https://wa.me/27636670985'),
+    ).toBe(true)
+    expect(document.body).not.toHaveTextContent('+27 61 188 36379')
   })
 
   it('opens and closes the quote inquiry dialog', () => {
