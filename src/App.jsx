@@ -251,9 +251,9 @@ const galleryItems = [
     image: pexelsPhoto(8487787),
     images: [
       { src: pexelsPhoto(8487787), alt: 'Black woman engineer wearing a hard hat and reflective vest' },
-      { src: pexelsPhoto(11174201), alt: 'African woman engineer reviewing technical plans outdoors' },
-      { src: pexelsPhoto(36574302), alt: 'Diverse engineering team collaborating with a tablet on site' },
-      { src: pexelsPhoto(5089723), alt: 'Woman professional inspecting an underground tunnel' },
+      { src: pexelsPhoto(8487795), alt: 'Woman engineer adjusting her hard hat in full protective equipment' },
+      { src: pexelsPhoto(8488006), alt: 'Woman industrial professional measuring on site in protective equipment' },
+      { src: pexelsPhoto(37039486), alt: 'Woman mine worker active in an open quarry' },
     ],
   },
   {
@@ -264,9 +264,9 @@ const galleryItems = [
     image: pexelsPhoto(37198880),
     images: [
       { src: pexelsPhoto(37198880), alt: 'African engineering leaders reviewing construction plans' },
-      { src: pexelsPhoto(37198882), alt: 'Diverse technical leadership team discussing blueprints' },
-      { src: pexelsPhoto(36574302), alt: 'Field leadership team collaborating at an industrial site' },
-      { src: pexelsPhoto(8487787), alt: 'Woman engineering leader in full protective equipment' },
+      { src: pexelsPhoto(37198874), alt: 'Technical leadership team coordinating work over site plans' },
+      { src: pexelsPhoto(8961126), alt: 'Woman site supervisor leading work beside steel infrastructure' },
+      { src: pexelsPhoto(32845686), alt: 'Woman engineer overseeing work inside an industrial facility' },
     ],
   },
   {
@@ -287,12 +287,12 @@ const galleryItems = [
     category: 'People & Leadership',
     title: 'One team, one standard',
     caption: 'Collaborative planning, field communication and shared responsibility for delivery.',
-    image: pexelsPhoto(36574302),
+    image: pexelsPhoto(37198874),
     images: [
-      { src: pexelsPhoto(36574302), alt: 'Diverse industrial team collaborating outdoors' },
-      { src: pexelsPhoto(37198882), alt: 'Engineers coordinating work over project plans' },
-      { src: pexelsPhoto(37923718), alt: 'Workers coordinating equipment in a quarry environment' },
-      { src: pexelsPhoto(12057331), alt: 'Mine worker demonstrating strength and practical skill underground' },
+      { src: pexelsPhoto(37198874), alt: 'Engineering team aligning around technical site plans' },
+      { src: pexelsPhoto(37198880), alt: 'Diverse industrial leaders reviewing plans together' },
+      { src: pexelsPhoto(8961126), alt: 'Woman supervisor in PPE at a steel construction site' },
+      { src: pexelsPhoto(8486977), alt: 'Confident woman engineer wearing high-visibility protective equipment' },
     ],
   },
 ]
